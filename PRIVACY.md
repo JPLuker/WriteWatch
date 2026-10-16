@@ -16,7 +16,7 @@ The SQLite session table contains ONLY:
 
 No filename, path, script title, character name, word list, content hash or text is stored in this database. A selected file path, file size/modification/inode signature and last observed word count exist in memory until the application closes. Script content exists transiently while parsing; this is not a promise of protection from operating-system swap, memory inspection, or crash dumps.
 
-History is stored in Qt's AppLocalDataLocation (normally `%LOCALAPPDATA%/WriteWatch/WriteWatch` on Windows and `~/.local/share/WriteWatch/WriteWatch` on Linux). An optional `WRITEWATCH_DATA_DIR` environment variable overrides that storage folder (useful for portable installs). History → Delete history clears completed/interrupted rows and vacuums the database. This is not forensic secure erasure and cannot delete OS backups. Removing the app does not automatically erase history.
+History is stored in Qt's AppLocalDataLocation (normally `%LOCALAPPDATA%/WriteWatch/WriteWatch` on Windows and `~/.local/share/WriteWatch/WriteWatch` on Linux, and `~/Library/Application Support/WriteWatch/WriteWatch` on macOS). An optional `WRITEWATCH_DATA_DIR` environment variable overrides that storage folder (useful for portable installs). History → Delete history clears completed/interrupted rows and vacuums the database. This is not forensic secure erasure and cannot delete OS backups. Removing the app does not automatically erase history.
 
 ## Sharing
 

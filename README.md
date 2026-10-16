@@ -1,12 +1,13 @@
 # WriteWatch
 
-A local Windows/Linux writing companion for Fade In, Final Draft, Word, LibreOffice, Markdown editors and more. Start a writing session, finish it, and copy your progress into your writers group. Your document stays on your computer.
+A local Windows/macOS/Linux writing companion for Fade In, Final Draft, Word, LibreOffice, Markdown editors and more. Start a writing session, finish it, and copy your progress into your writers group. Your document stays on your computer.
 
 ## Download
 
 Download the latest **prerelease** from [Releases](https://github.com/JPLuker/WriteWatch/releases).
 
 - **Windows x64:** run `WriteWatch-…-Windows-Setup.exe` (per-user installer), or extract the portable ZIP and run `WriteWatch.exe` inside its folder. Keep `_internal` alongside the executable. The initial builds are unsigned; Windows may show its unknown-publisher prompt.
+- **macOS 15+:** download the AppleSilicon DMG for M-series Macs or the Intel DMG for Intel Macs. Open it and drag WriteWatch into Applications. ZIP bundles are also available. These builds are ad-hoc signed for bundle integrity, but are **not Developer ID signed or notarized**. If the first launch is blocked, use System Settings → Privacy & Security → Open Anyway for this app. See [Mac installation notes](packaging/MAC_INSTALL.md).
 - **Linux x86_64:** make the AppImage executable in its Properties → Permissions and run it. If FUSE is unavailable, launch with `--appimage-extract-and-run`. Alternatively, extract the `.tar.gz` and run `WriteWatch/WriteWatch`. Targets Ubuntu 24.04 and similarly recent distributions (glibc 2.39+); Wayland and X11 use Qt. No keyboard hooks or compositor extensions.
 - Each main-branch build also provides downloads under [Actions](https://github.com/JPLuker/WriteWatch/actions). A successful main-branch build publishes a versioned prerelease automatically; bump the app version for each release.
 
@@ -90,10 +91,11 @@ python -m pip install -r requirements-build.txt
 python packaging/build.py
 # Linux AppImage: bash packaging/appimage.sh
 # Windows installer: ISCC packaging/windows.iss (Inno Setup 6)
+# macOS: build.py also creates the DMG and app ZIP on the native architecture
 ```
 
-CI runs parser, session, privacy, clipboard and UI tests on Windows and Linux before packaging. Source verification does not replace testing with your actual documents and desktop. Format adapters have fixture tests; unusual files still need hands-on validation.
+CI runs parser, session, privacy, clipboard and UI tests on Windows, Linux, Apple Silicon macOS and Intel macOS before packaging. Every packaged app also gets an isolated startup smoke test. Source verification does not replace testing with your actual documents and desktop. Format adapters have fixture tests; unusual files still need hands-on validation.
 
 ## Project status
 
-0.2.0 is a testing release with 12 format families / 20 file extensions. No official relationship with Fade In. This repository currently grants no license to WriteWatch source; Joseph retains rights. Dependency notices are in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+0.2.1 is a testing release with 12 format families / 20 file extensions. No official relationship with Fade In. This repository currently grants no license to WriteWatch source; Joseph retains rights. Dependency notices are in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
