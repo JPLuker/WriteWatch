@@ -165,7 +165,7 @@ class ShareDialog(QDialog):
 
 
 class Window(QMainWindow):
-    def __init__(self, store):
+    def __init__(self, store, update_folder=None):
         super().__init__()
         self.store = store
         self.path = None
@@ -182,7 +182,7 @@ class Window(QMainWindow):
         top = QHBoxLayout()
         top.addWidget(label("WriteWatch", "brand"))
         top.addStretch()
-        top.addWidget(label("LOCAL ONLY  •  YOUR WORDS STAY YOURS", "eyebrow"))
+        top.addWidget(label("YOUR WORDS STAY ON YOUR COMPUTER", "eyebrow"))
         layout.addLayout(top)
         self.tabs = QTabWidget()
         layout.addWidget(self.tabs)
@@ -190,6 +190,11 @@ class Window(QMainWindow):
         self.build_history()
         self.build_formats()
         self.build_privacy()
+        self.updates = None
+        if update_folder is not None:
+            from .update_ui import UpdatesPanel
+            self.updates = UpdatesPanel(self, update_folder)
+            self.tabs.addTab(self.updates, "Updates")
         layout.addWidget(label(f"Made by Joseph Luker   ·   v{__version__}", "muted"))
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.poll)
@@ -343,6 +348,7 @@ class Window(QMainWindow):
         layout.addWidget(label("Your story stays with you.", "title"))
         for title, text in [
             ("Private by design", "No accounts, analytics, uploads, keyboard recording or automatic posts. The selected document is opened read-only on this computer."),
+            ("Optional updates", "Automatic updates contact GitHub for release metadata and app downloads. GitHub receives normal connection information such as your IP address. No document or session data is sent. Turn automatic checks off in Updates."),
             ("Numbers, not drafts", "History stores session date, type, goal, duration, net word change, count-changing observations and completion status. It does not store document text, titles, filenames or paths."),
             ("An honest measure", "Net words compare saved word counts. Equal-length rewrites do not increase the number. Counting rules vary by format; see Formats & apps. Counts can differ from your editor. Cloud-only documents need a refreshed local export."),
             ("You control the clock", "Start / Pause / Done controls session time. It does not detect typing or focus. Edits saved while paused are excluded when you resume. A long system suspension pauses the timer. Save before pausing or finishing."),
@@ -506,6 +512,9 @@ class Window(QMainWindow):
                 QMessageBox.warning(self, "History unavailable", "Could not update history. Check available disk space.")
 
     def closeEvent(self, event):
+        if self.updates and not self.updates.allow_close():
+            event.ignore()
+            return
         if self.tracker:
             response = QMessageBox.question(self, "Session in progress", "Close and keep this as an interrupted session? Choose No to return and use Done to finish.", QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No, QMessageBox.StandardButton.No)
             if response != QMessageBox.StandardButton.Yes:
@@ -542,7 +551,7 @@ def main():
     except Exception:
         QMessageBox.critical(None, "History unavailable", "WriteWatch could not open local history. Check disk space and folder permissions.")
         return 1
-    window = Window(store)
+    window = Window(store, update_folder=None if os.environ.get("WRITEWATCH_DISABLE_UPDATES") == "1" else folder)
     window.show()
     result = app.exec()
     store.close()

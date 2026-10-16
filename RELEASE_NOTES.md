@@ -1,8 +1,9 @@
-WriteWatch 0.3.0 — optional session goals and session review.
+# WriteWatch v0.4.0 — optional automatic updates
 
-- Check Skip goal to start a session without a word or time target. Time and words still track normally; share summaries omit goal lines.
-- Review previous sessions with full date, duration, net words, original target and goal result. Double-click a history row or choose Review session.
-- Filter history by All time / Last 7 days / Last 30 days and Writing / Revision.
-- Existing history remains compatible, including interrupted sessions. No document content or paths are added to history.
+- Background checks and verified downloads from public GitHub releases, including previews.
+- Updates tab with an automatic-check off switch and manual checks.
+- Restart to Update for Windows installers/portable builds, Linux AppImages, and installed macOS apps. Active sessions must be finished first.
+- Previous app backups for portable, AppImage and Mac updates. History and goals stay in their existing data folder.
+- Privacy details now describe update requests: no writing or session information is sent.
 
-Windows EXE, Linux AppImage and Apple Silicon / Intel macOS DMGs are available below. macOS requires 15+ and builds are not Apple-notarized.
+**Install this version manually once** to receive future updates inside WriteWatch. macOS apps must be moved out of the DMG before updating. Source and Linux tar builds require manual updates. Mac builds require macOS 15+ and are ad-hoc signed, not notarized. Linux builds target Ubuntu 24.04 / glibc 2.39 or newer.

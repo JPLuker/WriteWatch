@@ -69,7 +69,7 @@ Adapter references: [WordprocessingML](https://learn.microsoft.com/en-us/office/
 
 ## Privacy
 
-No network requests, accounts, telemetry, global typing hooks, script snapshots or script uploads. Only aggregate session statistics are persisted. See [PRIVACY.md](PRIVACY.md).
+No accounts, telemetry, global typing hooks, script snapshots or script uploads. Optional automatic updates contact GitHub for release metadata and app downloads; no writing or session data is sent. Only aggregate session statistics are persisted. See [PRIVACY.md](PRIVACY.md).
 
 ## Development
 
@@ -99,3 +99,13 @@ CI runs parser, session, privacy, clipboard and UI tests on Windows, Linux, Appl
 ## Project status
 
 0.3.0 is a testing release with 12 format families / 20 file extensions. No official relationship with Fade In. This repository currently grants no license to WriteWatch source; Joseph retains rights. Dependency notices are in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+## Automatic updates (v0.4.0+)
+
+Install v0.4.0 manually once to enable future updates. WriteWatch checks GitHub five seconds after launch and every six hours, including preview releases, then downloads the newest compatible version in the background. Turn this off in **Updates**, or use **Check for updates** manually. Downloads are verified against GitHub's size and SHA-256 metadata. Offline or failed checks leave the current app usable.
+
+When **Update ready** appears, finish your session and select **Restart to Update**. Windows installer and portable builds, Linux AppImages, and installed macOS apps support this flow. The helper waits for WriteWatch to exit; it does not force-close a session. Session history remains in the app data folder. Portable, AppImage and Mac updates retain the previous app alongside the replacement with a `.previous-…` suffix for recovery. You can remove that backup after confirming the new version works. Downloaded installers are retained in the app data `updates` folder.
+
+Run an AppImage from a writable folder. On Mac, first move WriteWatch out of the DMG into a writable Applications folder; disk-image and App Translocation launches cannot update themselves. Source and Linux tar builds use manual installation. macOS builds remain ad-hoc signed, not notarized. Updates do not bypass macOS security settings. Installation errors are recorded in `updates/last-update.log` in the app data folder.
+
+Set `WRITEWATCH_DISABLE_UPDATES=1` to disable the updater completely, including network access, for managed deployments and tests.

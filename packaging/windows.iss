@@ -27,3 +27,11 @@ Name: "{autodesktop}\WriteWatch"; Filename: "{app}\WriteWatch.exe"; Tasks: deskt
 Name: "desktopicon"; Description: "Create a desktop shortcut"; Flags: unchecked
 [Run]
 Filename: "{app}\WriteWatch.exe"; Description: "Open WriteWatch"; Flags: nowait postinstall skipifsilent
+
+Filename: "{app}\WriteWatch.exe"; Flags: nowait; Check: IsUpdater
+
+[Code]
+function IsUpdater: Boolean;
+begin
+  Result := ExpandConstant('{param:WRITEWATCHUPDATE|0}') = '1';
+end;

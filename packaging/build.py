@@ -42,7 +42,7 @@ for filename in ('README.md', 'PRIVACY.md', 'THIRD_PARTY_NOTICES.md'):
 # Preserve wheel license notices alongside dynamically loaded Qt libraries.
 import importlib.metadata
 licenses = resources / 'licenses'
-for name in ('PySide6', 'PySide6_Essentials', 'PySide6_Addons', 'shiboken6', 'defusedxml', 'striprtf', 'markdown-it-py', 'mdurl', 'pypdf'):
+for name in ('PySide6', 'PySide6_Essentials', 'PySide6_Addons', 'shiboken6', 'defusedxml', 'striprtf', 'markdown-it-py', 'mdurl', 'pypdf', 'certifi'):
     dist = importlib.metadata.distribution(name)
     for file in dist.files or []:
         if any(part.lower() in ('licenses', 'license', 'copying') for part in file.parts) or 'license' in file.name.lower():

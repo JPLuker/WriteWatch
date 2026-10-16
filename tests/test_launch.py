@@ -11,7 +11,7 @@ import unittest
 class LaunchTests(unittest.TestCase):
     def test_entrypoint_stays_open_and_creates_history(self):
         with tempfile.TemporaryDirectory() as folder:
-            env = dict(os.environ, QT_QPA_PLATFORM='offscreen', XDG_DATA_HOME=folder,
+            env = dict(os.environ, WRITEWATCH_DISABLE_UPDATES='1', QT_QPA_PLATFORM='offscreen', XDG_DATA_HOME=folder,
                        LOCALAPPDATA=folder, APPDATA=folder, WRITEWATCH_DATA_DIR=folder)
             process = subprocess.Popen([sys.executable, '-m', 'writewatch'], env=env,
                                        stdout=subprocess.PIPE, stderr=subprocess.PIPE)

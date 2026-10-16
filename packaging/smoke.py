@@ -14,7 +14,7 @@ elif sys.platform == 'win32':
 else:
     binary = root / 'dist/WriteWatch/WriteWatch'
 with tempfile.TemporaryDirectory() as folder:
-    env = dict(os.environ, QT_QPA_PLATFORM='offscreen', WRITEWATCH_DATA_DIR=folder)
+    env = dict(os.environ, WRITEWATCH_DISABLE_UPDATES='1', QT_QPA_PLATFORM='offscreen', WRITEWATCH_DATA_DIR=folder)
     process = subprocess.Popen([str(binary)], env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     try:
         deadline = time.monotonic() + 20

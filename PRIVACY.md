@@ -1,6 +1,6 @@
 # WriteWatch privacy model
 
-The application opens the file you choose read-only. It temporarily parses its document text to count words. It does not modify the script, save text snapshots, send requests over a network, log your typing, read your clipboard, or publish to any service.
+The application opens the file you choose read-only. It temporarily parses its document text to count words. It does not modify the script, save text snapshots, log your typing, read your clipboard, or publish to any service.
 
 ## Stored data
 
@@ -27,3 +27,9 @@ The Done dialog shows the exact text copied. It contains only session type, date
 Unreadable/partially saved files preserve the last good count and show a generic error without XML content or paths. A failed final read leaves the session open for retry. Numeric checkpoints allow interrupted-session recovery after a crash. A single-instance lock prevents simultaneous writers from duplicating/recovering one another's active sessions. No automatic update checks are included.
 
 All format adapters operate locally. Links in Markdown, HTML, EPUB, DOCX or other documents are never followed over the network. Archives are read in memory without extracting their paths onto disk. XML entities are disabled. Encrypted PDFs and external EPUB chapters are rejected. New formats do not add any fields to stored history or shared summaries.
+
+## Optional software updates
+
+Starting with v0.4.0, packaged installations check GitHub's public WriteWatch releases and download compatible updates automatically. This includes preview releases. Disable **Automatically check and download updates** in the Updates tab to stop automatic requests; manual checks still work. Source builds do not check automatically.
+
+Requests contain the app version in the user agent. GitHub and its download infrastructure receive normal connection metadata, including your IP address, and the requested platform-specific asset. No document text, filenames, document paths, goals or session statistics are sent. There is no account, token, analytics or tracking identifier. Preferences and downloaded update packages are stored locally separately from history. Downloads are checked using GitHub's published size and SHA-256 checksum. This verifies integrity against release metadata; it is not an independent publisher signature.
