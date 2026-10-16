@@ -11,10 +11,11 @@ from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QPushButton, QFileDialog, QComboBox, QSpinBox, QFrame, QProgressBar,
     QTabWidget, QTableWidget, QTableWidgetItem, QHeaderView, QMessageBox,
-    QDialog, QPlainTextEdit, QAbstractItemView,
+    QDialog, QPlainTextEdit, QAbstractItemView, QScrollArea,
 )
 from . import __version__
 from .core import ScriptError, Session, Store, Tracker
+from .formats import file_filter, format_name
 
 STYLE = """
 QWidget { background: #10191b; color: #e7eeeb; font-family: 'Segoe UI', 'DejaVu Sans'; font-size: 14px; }
@@ -170,6 +171,7 @@ class Window(QMainWindow):
         layout.addWidget(self.tabs)
         self.build_session()
         self.build_history()
+        self.build_formats()
         self.build_privacy()
         layout.addWidget(label(f"Made by Joseph Luker   ·   v{__version__}", "muted"))
         self.timer = QTimer(self)
@@ -184,13 +186,13 @@ class Window(QMainWindow):
         layout.setContentsMargins(0, 20, 0, 0)
         layout.setSpacing(16)
         layout.addWidget(label("Make time for your story.", "title"))
-        description = label("Start a session, write in Fade In, then share how far you got.", "muted")
+        description = label("Start a session, write in your favorite editor, then share your progress.", "muted")
         description.setWordWrap(True)
         layout.addWidget(description)
         row = QHBoxLayout()
-        self.choose = button("Choose Fade In script…", self.pick)
+        self.choose = button("Choose writing file…", self.pick)
         row.addWidget(self.choose)
-        self.file_status = label("No script selected", "muted")
+        self.file_status = label("No document selected", "muted")
         row.addWidget(self.file_status, 1)
         layout.addLayout(row)
         options = QHBoxLayout()
@@ -232,7 +234,7 @@ class Window(QMainWindow):
         self.progress.setTextVisible(False)
         body.addWidget(self.progress)
         layout.addWidget(panel)
-        self.message = label("Save your script before starting. Progress updates when you save in Fade In.", "muted")
+        self.message = label("Save your document before starting. Progress updates whenever your editor saves this file.", "muted")
         self.message.setWordWrap(True)
         layout.addWidget(self.message)
         row = QHBoxLayout()
@@ -275,6 +277,30 @@ class Window(QMainWindow):
         layout.addLayout(row)
         self.tabs.addTab(page, "History")
 
+    def build_formats(self):
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(4, 20, 12, 12)
+        layout.setSpacing(16)
+        layout.addWidget(label("One workflow. Many editors.", "title"))
+        for title, detail in [
+            ("Screenplays", "Fade In (.fadein, .osf), Final Draft (.fdx), and Fountain (.fountain). WriterDuet, WriterSolo and other screenplay apps can supply a local FDX or Fountain export."),
+            ("Documents", "Word, LibreOffice, OpenOffice, ONLYOFFICE and WPS through .docx, .odt, .fodt or .rtf. AbiWord through .abw and .zabw. Track the format your editor actually saves."),
+            ("Notes & prose", "Obsidian, Typora, MarkText, Zettlr, iA Writer and other Markdown editors through .md, .markdown or .mdown. Plain-text editors through .txt or .text. UTF-8 and BOM-marked UTF-16 are supported."),
+            ("Exports & publishing", "HTML (.html, .htm, .xhtml), EPUB (.epub) and selectable-text PDF (.pdf). EPUB editors can be watched directly. PDFs include extracted headers, footers and page numbers; scanned PDFs need OCR elsewhere."),
+            ("Cloud apps and project formats", "Google Docs, Notion, Scrivener, Ulysses, Pages and browser-based editors need an export to a supported local format. WriteWatch cannot see cloud-only edits, .gdoc shortcuts or proprietary project contents. Re-export to the same selected path to update progress."),
+            ("What gets counted", "DOCX body text (including tables and inserted revisions), excluding deleted revisions and separate comments/headers/footers. ODT excludes annotations, tracked-change history and footnotes. Markdown excludes front matter, comments and link destinations; code text counts. Fountain excludes title metadata, notes, boneyards, section headings and synopses. EPUB counts linear text chapters. RTF counts extracted text. HTML strips markup, scripts and styles but does not interpret CSS visibility."),
+        ]:
+            layout.addWidget(label(title, "eyebrow"))
+            text = label(detail, "muted")
+            text.setWordWrap(True)
+            layout.addWidget(text)
+        layout.addStretch()
+        scroll.setWidget(page)
+        self.tabs.addTab(scroll, "Formats & apps")
+
     def build_privacy(self):
         page = QWidget()
         layout = QVBoxLayout(page)
@@ -282,9 +308,9 @@ class Window(QMainWindow):
         layout.setSpacing(20)
         layout.addWidget(label("Your story stays with you.", "title"))
         for title, text in [
-            ("Private by design", "No accounts, analytics, uploads, keyboard recording or automatic posts. The selected script is opened read-only on this computer."),
-            ("Numbers, not drafts", "History stores session date, type, goal, duration, net word change, count-changing observations and completion status. It does not store script text, titles, filenames or paths."),
-            ("An honest measure", "Net words are the difference between observed saved word counts. Replacements of equal length do not increase this number. Formatting, title pages and notes are excluded; character cues and scene headings are counted. Counts can differ from Fade In's own report."),
+            ("Private by design", "No accounts, analytics, uploads, keyboard recording or automatic posts. The selected document is opened read-only on this computer."),
+            ("Numbers, not drafts", "History stores session date, type, goal, duration, net word change, count-changing observations and completion status. It does not store document text, titles, filenames or paths."),
+            ("An honest measure", "Net words compare saved word counts. Equal-length rewrites do not increase the number. Counting rules vary by format; see Formats & apps. Counts can differ from your editor. Cloud-only documents need a refreshed local export."),
             ("You control the clock", "Start / Pause / Done controls session time. It does not detect typing or focus. Edits saved while paused are excluded when you resume. A long system suspension pauses the timer. Save before pausing or finishing."),
             ("Share on your terms", "Copy sends only the displayed summary to your system clipboard. Save image exports the metrics shown on the card. Your clipboard manager or clipboard sync may retain copied summaries."),
         ]:
@@ -301,10 +327,10 @@ class Window(QMainWindow):
         self.goal.setValue(30 if mode == "Revision" else 500)
 
     def pick(self):
-        path, _ = QFileDialog.getOpenFileName(self, "Choose a saved script", "", "Fade In / OSF (*.fadein *.osf)")
+        path, _ = QFileDialog.getOpenFileName(self, "Choose a saved writing file", "", file_filter())
         if path:
             self.path = Path(path)
-            self.file_status.setText("Script selected · filename kept private")
+            self.file_status.setText(format_name(self.path) + " selected · filename kept private")
             self.update_view()
 
     def persist(self):
@@ -324,9 +350,9 @@ class Window(QMainWindow):
         try:
             self.tracker = Tracker(self.path, self.mode.currentText(), self.goal.value())
             if self.persist():
-                self.message.setText("Session running. Save in Fade In to update your progress.")
+                self.message.setText("Session running. Save in your editor to update your progress.")
         except ScriptError as error:
-            QMessageBox.warning(self, "Script unavailable", str(error))
+            QMessageBox.warning(self, "Document unavailable", str(error))
         self.update_view()
 
     def poll(self):
@@ -336,7 +362,7 @@ class Window(QMainWindow):
         try:
             self.tracker.observe()
             if self.tracker.session.status == "running":
-                self.message.setText("Reading saved progress every 2 seconds · save in Fade In before finishing.")
+                self.message.setText("Reading saved progress every 2 seconds · save in your editor before finishing.")
             else:
                 self.message.setText("Paused. Resume when ready; changes saved during this pause are excluded.")
         except ScriptError as error:

@@ -14,3 +14,5 @@ Corresponding upstream sources and license information:
 - AppImage tooling: https://github.com/AppImage/appimagetool
 
 Fade In and its marks belong to their respective owners. WriteWatch is an independent companion application.
+
+Additional format readers: striprtf (BSD-3-Clause), markdown-it-py and mdurl (MIT), and pypdf (BSD-3-Clause). Their wheel license notices are included under `licenses/`. Sources: https://github.com/joshy/striprtf , https://github.com/executablebooks/markdown-it-py , https://github.com/executablebooks/mdurl , https://github.com/py-pdf/pypdf .

@@ -28,7 +28,7 @@ shutil.copy('THIRD_PARTY_NOTICES.md', 'dist/WriteWatch/THIRD_PARTY_NOTICES.md')
 # Preserve wheel license notices alongside dynamically loaded Qt libraries.
 import importlib.metadata
 licenses = ROOT / 'dist' / 'WriteWatch' / 'licenses'
-for name in ('PySide6', 'PySide6_Essentials', 'PySide6_Addons', 'shiboken6', 'defusedxml'):
+for name in ('PySide6', 'PySide6_Essentials', 'PySide6_Addons', 'shiboken6', 'defusedxml', 'striprtf', 'markdown-it-py', 'mdurl', 'pypdf'):
     dist = importlib.metadata.distribution(name)
     for file in dist.files or []:
         if any(part.lower() in ('licenses', 'license', 'copying') for part in file.parts) or 'license' in file.name.lower():

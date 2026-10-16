@@ -1,2 +1,5 @@
 PySide6==6.12.0
 defusedxml==0.7.1
+striprtf==0.0.33
+markdown-it-py==4.2.0
+pypdf==6.10.0
