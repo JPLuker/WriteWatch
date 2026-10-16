@@ -71,4 +71,4 @@ CI runs parser, session, privacy, clipboard and UI tests on Windows and Linux be
 
 ## Project status
 
-0.1.0 is an initial testing release. No official relationship with Fade In. This repository currently grants no license to WriteWatch source; Joseph retains rights. Dependency notices are in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+0.1.1 is an initial testing release. No official relationship with Fade In. This repository currently grants no license to WriteWatch source; Joseph retains rights. Dependency notices are in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

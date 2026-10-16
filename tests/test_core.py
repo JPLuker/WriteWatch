@@ -36,7 +36,7 @@ class CoreTests(unittest.TestCase):
     def test_format_runs_namespaces_and_private_metadata(self):
         self.path.write_text('''<document xmlns="urn:osf"><titlepage><para><text>Secret Title</text></para></titlepage>
         <paragraphs><para synopsis="secret"><text>hel</text><text>lo <b>world</b> café don't well-known</text>
-        <note><text>hidden note here</text></note></para></paragraphs></document>''')
+        <note><text>hidden note here</text></note></para></paragraphs></document>''', encoding='utf-8')
         self.assertEqual(word_count(self.path), 5)
 
     def test_reject_entities_without_leaking_content(self):
