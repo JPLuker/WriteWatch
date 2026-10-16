@@ -15,7 +15,7 @@ Download the latest **prerelease** from [Releases](https://github.com/JPLuker/Wr
 
 1. Save your document in your editor.
 2. Open WriteWatch and **Choose writing file**. Selection stays in memory and is not saved to history.
-3. Pick **Writing** with a net-word goal, or **Revision** with a minute goal.
+3. Pick **Writing** with a net-word goal, or **Revision** with a minute goal. Check **Skip goal** to track a session without a target.
 4. Click **Start session**, then write normally. WriteWatch checks your selected file every two seconds and parses it when it changes.
 5. Save before **Pause** or **Done**. Resume excludes changes saved during the pause.
 6. Click **Done — share progress**, then **Copy for writers group**. Paste it wherever you want. No automatic posting.
@@ -31,7 +31,7 @@ Goal: 500 net words
 #WriteWatch
 ```
 
-History lets you copy older sessions again and shows weekly totals and a writing streak. A PNG share card is optional. **Delete history** removes local completed/interrupted statistics; it never touches your script.
+History saves completed and interrupted sessions locally across restarts. Filter by date range or Writing/Revision, then select **Review session** (or double-click a row) to see its date, time, net words, target and result. You can copy or export it again from that review. Weekly totals and a writing streak remain visible. Skipped goals show “No goal set” in history and are omitted from shared summaries. A PNG share card is optional. **Delete history** removes local completed/interrupted statistics; it never touches your script.
 
 ## What the numbers mean
 
@@ -98,4 +98,4 @@ CI runs parser, session, privacy, clipboard and UI tests on Windows, Linux, Appl
 
 ## Project status
 
-0.2.1 is a testing release with 12 format families / 20 file extensions. No official relationship with Fade In. This repository currently grants no license to WriteWatch source; Joseph retains rights. Dependency notices are in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+0.3.0 is a testing release with 12 format families / 20 file extensions. No official relationship with Fade In. This repository currently grants no license to WriteWatch source; Joseph retains rights. Dependency notices are in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

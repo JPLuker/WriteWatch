@@ -1,8 +1,8 @@
-WriteWatch 0.2.1 — macOS support.
+WriteWatch 0.3.0 — optional session goals and session review.
 
-- Native macOS builds for Apple Silicon and Intel, each available as a drag-to-Applications DMG and app ZIP.
-- Requires macOS 15 or newer. These testing builds are not Developer ID signed or notarized; macOS may require Privacy & Security → Open Anyway for the first launch.
-- The same private writing sessions, 12 format families, history and one-click text sharing on all platforms.
-- CI runs all tests on Windows, Linux and both Mac architectures, then verifies each packaged executable starts before publishing.
+- Check Skip goal to start a session without a word or time target. Time and words still track normally; share summaries omit goal lines.
+- Review previous sessions with full date, duration, net words, original target and goal result. Double-click a history row or choose Review session.
+- Filter history by All time / Last 7 days / Last 30 days and Writing / Revision.
+- Existing history remains compatible, including interrupted sessions. No document content or paths are added to history.
 
-Windows EXE and Linux AppImage downloads remain available below. Your existing session history is preserved. Mac installation instructions are included in the DMG and repository.
+Windows EXE, Linux AppImage and Apple Silicon / Intel macOS DMGs are available below. macOS requires 15+ and builds are not Apple-notarized.

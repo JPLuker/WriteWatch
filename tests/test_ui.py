@@ -5,6 +5,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+from PySide6.QtCore import QCoreApplication, QEvent
 from PySide6.QtWidgets import QApplication
 from writewatch.app import Window, ShareDialog, STYLE, card
 from writewatch.core import Store
@@ -16,6 +17,14 @@ class UiTests(unittest.TestCase):
     def setUpClass(cls):
         cls.app = QApplication.instance() or QApplication([])
         cls.app.setStyleSheet(STYLE)
+
+    def tearDown(self):
+        # Dispose native widgets while QApplication is alive, before Python's
+        # module/class teardown can destroy the application out of order.
+        for widget in self.app.topLevelWidgets():
+            widget.deleteLater()
+        QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+        self.app.processEvents()
 
     def test_real_session_done_copy_history_and_png(self):
         with tempfile.TemporaryDirectory() as folder:

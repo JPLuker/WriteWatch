@@ -8,7 +8,7 @@ The SQLite session table contains ONLY:
 
 - Random session ID
 - Session start timestamp and timezone offset
-- Writing/revision mode and numeric goal
+- Writing/revision mode and numeric goal (zero records a skipped goal)
 - Accumulated manual timer seconds
 - Net word-count change
 - Number of observations where the word count changed

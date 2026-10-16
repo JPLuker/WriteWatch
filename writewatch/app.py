@@ -11,7 +11,7 @@ from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QPushButton, QFileDialog, QComboBox, QSpinBox, QFrame, QProgressBar,
     QTabWidget, QTableWidget, QTableWidgetItem, QHeaderView, QMessageBox,
-    QDialog, QPlainTextEdit, QAbstractItemView, QScrollArea,
+    QDialog, QPlainTextEdit, QAbstractItemView, QScrollArea, QCheckBox,
 )
 from . import __version__
 from .core import ScriptError, Session, Store, Tracker
@@ -105,8 +105,8 @@ def card(session: Session) -> QPixmap:
     p.setPen(QColor("#a7bbb6"))
     p.drawText(64, 510, "SESSION TIME")
     p.drawText(640, 510, "NET WORDS")
-    goal = f"{session.goal:,} net words" if session.mode == "Writing" else f"{session.goal} minutes"
-    p.drawText(64, 610, f"{round(session.progress * 100)}% of goal  /  {goal}")
+    goal_text = f"{session.goal_result}  /  {session.goal_label}" if session.goal else "A session for the sake of writing."
+    p.drawText(64, 610, goal_text)
     p.setFont(QFont("DejaVu Sans", 13))
     p.drawText(64, 665, "Progress worth sharing. Story kept private.")
     p.end()
@@ -114,14 +114,31 @@ def card(session: Session) -> QPixmap:
 
 
 class ShareDialog(QDialog):
-    def __init__(self, session, parent=None):
+    def __init__(self, session, parent=None, review=False):
         super().__init__(parent)
         self.setWindowTitle("Your session · WriteWatch")
         self.resize(620, 410)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(28, 24, 28, 24)
         layout.setSpacing(16)
-        layout.addWidget(label("That's a session.", "title"))
+        layout.addWidget(label("Session review" if review else "That's a session.", "title"))
+        if review:
+            date = datetime.fromisoformat(session.started).astimezone().strftime("%A, %B %d, %Y · %I:%M %p")
+            layout.addWidget(label(date, "muted"))
+            panel = QFrame()
+            panel.setObjectName("panel")
+            details = QVBoxLayout(panel)
+            details.setContentsMargins(20, 16, 20, 16)
+            minutes, seconds = divmod(int(session.seconds), 60)
+            state = "Completed" if session.status == "done" else "Interrupted — last saved checkpoint"
+            for text in (f"{session.mode} · {state}", f"Session time: {minutes}m {seconds:02d}s",
+                         f"Net words: {session.net:+,}", f"Goal: {session.goal_label}",
+                         session.goal_result if session.goal else "You chose to write without a target."):
+                item = label(text)
+                item.setWordWrap(True)
+                details.addWidget(item)
+            layout.addWidget(panel)
+            layout.addWidget(label("SHAREABLE SUMMARY", "eyebrow"))
         layout.addWidget(label("Copy your progress. Keep your story yours.", "muted"))
         self.text = QPlainTextEdit(session.summary())
         self.text.setReadOnly(True)
@@ -210,6 +227,10 @@ class Window(QMainWindow):
         self.goal.setSuffix(" net words")
         self.goal.setAccessibleName("Session goal")
         options.addWidget(self.goal)
+        self.skip_goal = QCheckBox("Skip goal")
+        self.skip_goal.setToolTip("Track time and words without a target for this session.")
+        self.skip_goal.toggled.connect(lambda _: self.update_view())
+        options.addWidget(self.skip_goal)
         options.addStretch()
         layout.addLayout(options)
         panel = QFrame()
@@ -259,8 +280,20 @@ class Window(QMainWindow):
         layout.addWidget(label("Every session adds up.", "title"))
         self.totals = label("", "muted")
         layout.addWidget(self.totals)
-        self.table = QTableWidget(0, 5)
-        self.table.setHorizontalHeaderLabels(["Started", "Session", "Time", "Net words", "Goal"])
+        filters = QHBoxLayout()
+        self.history_period = QComboBox()
+        self.history_period.addItems(["All time", "Last 7 days", "Last 30 days"])
+        self.history_period.setAccessibleName("History date range")
+        self.history_mode = QComboBox()
+        self.history_mode.addItems(["All sessions", "Writing", "Revision"])
+        self.history_mode.setAccessibleName("History session type")
+        for control in (self.history_period, self.history_mode):
+            control.currentTextChanged.connect(self.refresh_history)
+            filters.addWidget(control)
+        filters.addStretch()
+        layout.addLayout(filters)
+        self.table = QTableWidget(0, 6)
+        self.table.setHorizontalHeaderLabels(["Started", "Session", "Time", "Net words", "Goal", "Result"])
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.table.verticalHeader().hide()
         self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
@@ -271,7 +304,8 @@ class Window(QMainWindow):
         self.empty = label("Your finished sessions will appear here. Start with a few minutes.", "muted")
         layout.addWidget(self.empty)
         row = QHBoxLayout()
-        row.addWidget(button("Share selected session", self.share_selected, True))
+        self.review_button = button("Review session", self.share_selected, True)
+        row.addWidget(self.review_button)
         row.addStretch()
         row.addWidget(button("Delete history…", self.clear_history))
         layout.addLayout(row)
@@ -348,7 +382,7 @@ class Window(QMainWindow):
         if not self.path:
             return
         try:
-            self.tracker = Tracker(self.path, self.mode.currentText(), self.goal.value())
+            self.tracker = Tracker(self.path, self.mode.currentText(), 0 if self.skip_goal.isChecked() else self.goal.value())
             if self.persist():
                 self.message.setText("Session running. Save in your editor to update your progress.")
         except ScriptError as error:
@@ -402,8 +436,9 @@ class Window(QMainWindow):
 
     def update_view(self):
         active = self.tracker is not None
-        for widget in (self.choose, self.mode, self.goal):
+        for widget in (self.choose, self.mode, self.skip_goal):
             widget.setEnabled(not active)
+        self.goal.setEnabled(not active and not self.skip_goal.isChecked())
         self.start.setEnabled(not active and self.path is not None)
         self.pause_button.setEnabled(active)
         self.done.setEnabled(active)
@@ -416,24 +451,37 @@ class Window(QMainWindow):
         self.time_label.setText(f"{minutes:02d}:{seconds:02d}")
         self.words.setText(f"{session.net if active else 0:+,}")
         percent = round(session.progress * 100) if active else 0
-        self.percent.setText(f"{percent}%")
+        has_goal = bool(session.goal) if active else not self.skip_goal.isChecked()
+        self.percent.setText(f"{percent}%" if has_goal else "—")
+        self.percent.setToolTip("No goal set" if not has_goal else "Progress toward this session's goal")
+        self.progress.setVisible(has_goal)
         self.progress.setValue(percent)
 
-    def refresh_history(self):
-        self.history = self.store.history()
+    def refresh_history(self, *_):
+        all_sessions = self.store.history()
+        today = datetime.now().date()
+        period = self.history_period.currentText()
+        days_back = 7 if period == "Last 7 days" else 30 if period == "Last 30 days" else None
+        mode = self.history_mode.currentText()
+        self.history = [s for s in all_sessions
+                        if (mode == "All sessions" or s.mode == mode)
+                        and (days_back is None or today - timedelta(days=days_back - 1)
+                             <= datetime.fromisoformat(s.started).astimezone().date() <= today)]
         self.table.setRowCount(len(self.history))
         for row, session in enumerate(self.history):
-            date = datetime.fromisoformat(session.started).strftime("%b %d · %H:%M")
+            date = datetime.fromisoformat(session.started).astimezone().strftime("%Y-%m-%d %H:%M")
             minutes, seconds = divmod(int(session.seconds), 60)
             values = [date, session.mode + (" (interrupted)" if session.status == "interrupted" else ""),
-                      f"{minutes}m {seconds:02d}s", f"{session.net:+,}", f"{round(session.progress * 100)}%"]
+                      f"{minutes}m {seconds:02d}s", f"{session.net:+,}", session.goal_label, session.goal_result]
             for col, value in enumerate(values):
                 self.table.setItem(row, col, QTableWidgetItem(value))
+        self.empty.setText("No sessions match these filters." if all_sessions else "Your finished sessions will appear here. Start with a few minutes.")
         self.empty.setVisible(not self.history)
+        self.review_button.setEnabled(bool(self.history))
         today = datetime.now().date()
         week_start = today - timedelta(days=today.weekday())
-        week = [s for s in self.history if week_start <= datetime.fromisoformat(s.started).astimezone().date() <= today]
-        days = {datetime.fromisoformat(s.started).astimezone().date() for s in self.history if s.status == "done"}
+        week = [s for s in all_sessions if week_start <= datetime.fromisoformat(s.started).astimezone().date() <= today]
+        days = {datetime.fromisoformat(s.started).astimezone().date() for s in all_sessions if s.status == "done"}
         day = today if today in days else today - timedelta(days=1)
         streak = 0
         while day in days:
@@ -447,7 +495,7 @@ class Window(QMainWindow):
     def share_selected(self, *_):
         row = self.table.currentRow()
         if 0 <= row < len(self.history):
-            ShareDialog(self.history[row], self).exec()
+            ShareDialog(self.history[row], self, review=True).exec()
 
     def clear_history(self):
         if QMessageBox.question(self, "Delete history?", "Delete all completed and interrupted session statistics? This cannot be undone.") == QMessageBox.StandardButton.Yes:

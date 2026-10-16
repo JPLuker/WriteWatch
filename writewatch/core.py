@@ -24,24 +24,40 @@ class Session:
 
     @classmethod
     def new(cls, mode: str, goal: int):
-        if mode not in ("Writing", "Revision") or not 1 <= goal <= 100000:
+        if mode not in ("Writing", "Revision") or not 0 <= goal <= 100000:
             raise ValueError("Invalid session goal")
         return cls(uuid.uuid4().hex, datetime.now().astimezone().isoformat(), mode, goal)
 
     @property
     def progress(self):
+        if self.goal == 0:
+            return 0.0
         amount = max(0, self.net) if self.mode == "Writing" else self.seconds / 60
         return min(1.0, amount / self.goal)
+
+    @property
+    def goal_label(self):
+        if not self.goal:
+            return "No goal set"
+        return f"{self.goal:,} net words" if self.mode == "Writing" else f"{self.goal} minutes"
+
+    @property
+    def goal_result(self):
+        if not self.goal:
+            return "No goal set"
+        if self.progress >= 1:
+            return "Goal reached"
+        return f"{round(self.progress * 100)}% of goal"
 
     def summary(self):
         date = datetime.fromisoformat(self.started).strftime("%b %d, %Y")
         minutes, seconds = divmod(int(self.seconds), 60)
-        goal = f"{self.goal:,} net words" if self.mode == "Writing" else f"{self.goal} minutes"
         heading = "Session complete" if self.status == "done" else "Interrupted session"
-        return (f"WriteWatch · {date}\n{self.mode} · {heading}\n"
-                f"Goal progress: {round(self.progress * 100)}%\n"
-                f"Time: {minutes}m {seconds:02d}s · {self.net:+,} net words\n"
-                f"Goal: {goal}\n#WriteWatch")
+        lines = [f"WriteWatch · {date}", f"{self.mode} · {heading}",
+                 f"Time: {minutes}m {seconds:02d}s · {self.net:+,} net words"]
+        if self.goal:
+            lines += [f"Goal: {self.goal_label}", f"Goal progress: {round(self.progress * 100)}%"]
+        return "\n".join(lines + ["#WriteWatch"])
 
 
 class Tracker:
