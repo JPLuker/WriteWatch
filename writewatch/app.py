@@ -5,47 +5,21 @@ from pathlib import Path
 import sys
 import os
 
-from PySide6.QtCore import Qt, QTimer, QStandardPaths, QLockFile
+from PySide6.QtCore import Qt, QTimer, QStandardPaths, QLockFile, QSettings
 from PySide6.QtGui import QColor, QFont, QPainter, QPixmap, QIcon
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QPushButton, QFileDialog, QComboBox, QSpinBox, QFrame, QProgressBar,
     QTabWidget, QTableWidget, QTableWidgetItem, QHeaderView, QMessageBox,
-    QDialog, QPlainTextEdit, QAbstractItemView, QScrollArea, QCheckBox,
+    QDialog, QPlainTextEdit, QAbstractItemView, QScrollArea, QCheckBox, QToolButton,
 )
 from . import __version__
 from .core import ScriptError, Session, Store, Tracker
 from .formats import file_filter, format_name
 
-STYLE = """
-QWidget { background: #10191b; color: #e7eeeb; font-family: 'Segoe UI', 'DejaVu Sans'; font-size: 14px; }
-QMainWindow, QDialog { background: #10191b; }
-QLabel#brand { font-size: 25px; font-weight: 700; color: #b5e3bf; }
-QLabel#title { font-size: 32px; font-weight: 700; }
-QLabel#muted { color: #a7bbb6; }
-QLabel#eyebrow { color: #b5e3bf; font-size: 12px; font-weight: 700; }
-QLabel#number { font-size: 38px; font-weight: 600; }
-QLabel#timer { font-size: 64px; font-weight: 600; }
-QFrame#panel { background: #192629; border: 1px solid #304043; border-radius: 16px; }
-QFrame#panel QLabel { background: transparent; }
-QPushButton { background: #26383a; border: 1px solid #435a59; border-radius: 8px; padding: 11px 18px; font-weight: 600; }
-QPushButton:hover { background: #354b4c; }
-QPushButton:pressed { background: #405c58; }
-QPushButton#primary { background: #b5e3bf; color: #13291d; border: 0; }
-QPushButton#primary:hover { background: #d0f0d7; }
-QPushButton#primary:disabled, QPushButton:disabled { background: #202d2e; color: #657b76; border-color: #304043; }
-QComboBox, QSpinBox, QPlainTextEdit { background: #192629; border: 1px solid #435a59; border-radius: 7px; padding: 9px; }
-QComboBox QAbstractItemView { background: #26383a; selection-background-color: #405c58; }
-QTabWidget::pane { border: 0; }
-QTabBar::tab { background: #10191b; color: #a7bbb6; padding: 13px 22px; margin-right: 8px; border-bottom: 2px solid transparent; }
-QTabBar::tab:selected { color: #b5e3bf; border-bottom: 2px solid #b5e3bf; }
-QProgressBar { border: 0; background: #304043; border-radius: 5px; min-height: 10px; max-height: 10px; }
-QProgressBar::chunk { background: #b5e3bf; border-radius: 5px; }
-QTableWidget { background: #192629; border: 1px solid #304043; gridline-color: #304043; selection-background-color: #36574b; }
-QHeaderView::section { background: #26383a; border: 0; padding: 11px; color: #b5c9c2; }
-QCheckBox { spacing: 10px; }
-QToolTip { background: #26383a; color: #e7eeeb; border: 1px solid #435a59; }
-"""
+from .theme import AmbientCanvas, apply_theme, stylesheet, DARK, FloatingTabs, nav_icon
+STYLE = stylesheet(True)
+
 
 
 def label(text, name=None):
@@ -67,14 +41,14 @@ def button(text, callback, primary=False):
 
 def icon():
     pix = QPixmap(128, 128)
-    pix.fill(QColor("#10191b"))
+    pix.fill(QColor(DARK["canvas"]))
     p = QPainter(pix)
     p.setRenderHint(QPainter.RenderHint.Antialiasing)
     p.setPen(Qt.PenStyle.NoPen)
-    p.setBrush(QColor("#b5e3bf"))
+    p.setBrush(QColor(DARK["accent"]))
     p.drawRoundedRect(12, 12, 104, 104, 26, 26)
-    p.setPen(QColor("#13291d"))
-    p.setFont(QFont("DejaVu Sans", 49, QFont.Weight.Bold))
+    p.setPen(QColor(DARK["onaccent"]))
+    p.setFont(QFont(QApplication.font().family(), 49, QFont.Weight.DemiBold))
     p.drawText(pix.rect(), Qt.AlignmentFlag.AlignCenter, "W")
     p.end()
     return QIcon(pix)
@@ -83,32 +57,31 @@ def icon():
 def card(session: Session) -> QPixmap:
     """Render only explicit public metrics. No filename or content input exists."""
     pix = QPixmap(1200, 720)
-    pix.fill(QColor("#10191b"))
+    pix.fill(QColor(DARK["canvas"]))
     p = QPainter(pix)
     p.setRenderHint(QPainter.RenderHint.Antialiasing)
-    p.setPen(QColor("#b5e3bf"))
-    p.setFont(QFont("DejaVu Sans", 20, QFont.Weight.Bold))
-    p.drawText(64, 75, "WRITEWATCH")
-    p.setPen(QColor("#e7eeeb"))
-    p.setFont(QFont("DejaVu Sans", 38, QFont.Weight.Bold))
-    p.drawText(64, 165, "A little more of the story.")
-    p.setFont(QFont("DejaVu Sans", 18))
+    p.setPen(QColor(DARK["accent"]))
+    p.setFont(QFont(QApplication.font().family(), 20, QFont.Weight.DemiBold))
+    p.drawText(64, 75, "WriteWatch")
+    p.setPen(QColor(DARK["text"]))
+    p.setFont(QFont(QApplication.font().family(), 38, QFont.Weight.DemiBold))
+    p.drawText(64, 165, "Session complete" if session.status == "done" else "Session interrupted")
+    p.setFont(QFont(QApplication.font().family(), 18))
     date = datetime.fromisoformat(session.started).strftime("%B %d, %Y")
     status = "Complete" if session.status == "done" else "Interrupted"
     p.drawText(64, 215, f"{session.mode} session  /  {date}  /  {status}")
-    p.setPen(QColor("#e7eeeb"))
-    p.setFont(QFont("DejaVu Sans", 39, QFont.Weight.Bold))
+    p.setPen(QColor(DARK["text"]))
+    p.setFont(QFont(QApplication.font().family(), 39, QFont.Weight.DemiBold))
     minutes, seconds = divmod(int(session.seconds), 60)
     p.drawText(64, 465, f"{minutes}m {seconds:02d}s")
     p.drawText(640, 465, f"{session.net:+,}")
-    p.setFont(QFont("DejaVu Sans", 17))
-    p.setPen(QColor("#a7bbb6"))
-    p.drawText(64, 510, "SESSION TIME")
-    p.drawText(640, 510, "NET WORDS")
-    goal_text = f"{session.goal_result}  /  {session.goal_label}" if session.goal else "A session for the sake of writing."
+    p.setFont(QFont(QApplication.font().family(), 17))
+    p.setPen(QColor(DARK["secondary"]))
+    p.drawText(64, 510, "Session time")
+    p.drawText(640, 510, "Net words")
+    goal_text = f"{session.goal_result}  /  {session.goal_label}" if session.goal else "No goal set"
     p.drawText(64, 610, goal_text)
-    p.setFont(QFont("DejaVu Sans", 13))
-    p.drawText(64, 665, "Progress worth sharing. Story kept private.")
+    p.setFont(QFont(QApplication.font().family(), 13))
     p.end()
     return pix
 
@@ -119,9 +92,9 @@ class ShareDialog(QDialog):
         self.setWindowTitle("Your session · WriteWatch")
         self.resize(620, 410)
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(28, 24, 28, 24)
+        layout.setContentsMargins(24, 24, 24, 24)
         layout.setSpacing(16)
-        layout.addWidget(label("Session review" if review else "That's a session.", "title"))
+        layout.addWidget(label("Session review" if review else "Session complete", "title"))
         if review:
             date = datetime.fromisoformat(session.started).astimezone().strftime("%A, %B %d, %Y · %I:%M %p")
             layout.addWidget(label(date, "muted"))
@@ -133,13 +106,15 @@ class ShareDialog(QDialog):
             state = "Completed" if session.status == "done" else "Interrupted — last saved checkpoint"
             for text in (f"{session.mode} · {state}", f"Session time: {minutes}m {seconds:02d}s",
                          f"Net words: {session.net:+,}", f"Goal: {session.goal_label}",
-                         session.goal_result if session.goal else "You chose to write without a target."):
+                         session.goal_result if session.goal else "No goal set"):
                 item = label(text)
                 item.setWordWrap(True)
                 details.addWidget(item)
+            details_toggle = QCheckBox("Session details")
+            details_toggle.toggled.connect(panel.setVisible)
+            panel.hide()
+            layout.addWidget(details_toggle)
             layout.addWidget(panel)
-            layout.addWidget(label("SHAREABLE SUMMARY", "eyebrow"))
-        layout.addWidget(label("Copy your progress. Keep your story yours.", "muted"))
         self.text = QPlainTextEdit(session.summary())
         self.text.setReadOnly(True)
         self.text.setMinimumHeight(180)
@@ -153,7 +128,7 @@ class ShareDialog(QDialog):
 
     def copy_summary(self):
         QApplication.clipboard().setText(self.text.toPlainText())
-        self.copy.setText("Copied ✓")
+        self.copy.setText("Copied")
 
     def save_image(self, session):
         path, _ = QFileDialog.getSaveFileName(self, "Save share card", "WriteWatch-session.png", "PNG image (*.png)")
@@ -170,61 +145,109 @@ class Window(QMainWindow):
         self.store = store
         self.path = None
         self.tracker = None
-        self.setWindowTitle(f"WriteWatch {__version__}")
+        self.setWindowTitle("WriteWatch")
         self.setWindowIcon(icon())
         self.resize(1000, 850)
-        self.setMinimumSize(800, 700)
-        base = QWidget()
+        self.setMinimumSize(720, 540)
+        base = AmbientCanvas()
         self.setCentralWidget(base)
         layout = QVBoxLayout(base)
-        layout.setContentsMargins(32, 22, 32, 20)
+        layout.setContentsMargins(24, 24, 24, 24)
         layout.setSpacing(16)
         top = QHBoxLayout()
         top.addWidget(label("WriteWatch", "brand"))
         top.addStretch()
-        top.addWidget(label("YOUR WORDS STAY ON YOUR COMPUTER", "eyebrow"))
         layout.addLayout(top)
         self.tabs = QTabWidget()
+        self.tabs.setTabBar(FloatingTabs())
         layout.addWidget(self.tabs)
         self.build_session()
         self.build_history()
         self.build_formats()
         self.build_privacy()
-        self.updates = None
-        if update_folder is not None:
-            from .update_ui import UpdatesPanel
-            self.updates = UpdatesPanel(self, update_folder)
-            self.tabs.addTab(self.updates, "Updates")
-        layout.addWidget(label(f"Made by Joseph Luker   ·   v{__version__}", "muted"))
+        self.build_settings(update_folder)
+        for index in range(self.tabs.count()):
+            self.tabs.setTabIcon(index, nav_icon(index))
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.poll)
         self.timer.start(2000)
         self.refresh_history()
         self.update_view()
 
+    def add_scroll_tab(self, page, title):
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setWidget(page)
+        if title in ('Session', 'Settings', 'Privacy'):
+            page.setMaximumWidth(720)
+            scroll.setAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop)
+        self.tabs.addTab(scroll, title)
+
+    def build_settings(self, folder):
+        # FOCAL: available update action. Appearance stays neutral.
+        self.preferences = QSettings(str(Path(folder) / "appearance.ini"), QSettings.Format.IniFormat) if folder else None
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(0, 24, 0, 0)
+        layout.setSpacing(16)
+        layout.addWidget(label("Appearance", "section"))
+        row = QHBoxLayout()
+        row.addWidget(label("Theme"))
+        self.theme_choice = QComboBox()
+        self.theme_choice.addItems(["System", "Light", "Dark"])
+        self.theme_choice.setAccessibleName("Theme")
+        self.theme_choice.setCurrentText(self.preferences.value("theme", "System") if self.preferences else "System")
+        row.addWidget(self.theme_choice)
+        row.addStretch()
+        layout.addLayout(row)
+        self.ambient_choice = QCheckBox("Ambient background")
+        self.ambient_choice.setChecked(self.preferences.value("ambient", True, type=bool) if self.preferences else True)
+        layout.addWidget(self.ambient_choice)
+        self.theme_choice.currentTextChanged.connect(self.change_appearance)
+        self.ambient_choice.toggled.connect(self.change_appearance)
+        QApplication.instance().styleHints().colorSchemeChanged.connect(self.change_appearance)
+        self.updates = None
+        if folder is not None and os.environ.get("WRITEWATCH_DISABLE_UPDATES") != "1":
+            from .update_ui import UpdatesPanel
+            self.updates = UpdatesPanel(self, folder)
+            layout.addWidget(self.updates)
+        layout.addStretch()
+        layout.addWidget(label(f"WriteWatch {__version__}\nMade by Joseph Luker", "muted"))
+        self.add_scroll_tab(page, "Settings")
+        self.settings_tab = self.tabs.widget(self.tabs.count() - 1)
+        if folder is not None:
+            self.change_appearance()
+
+    def change_appearance(self, *_):
+        choice, ambient = self.theme_choice.currentText(), self.ambient_choice.isChecked()
+        if self.preferences:
+            self.preferences.setValue("theme", choice)
+            self.preferences.setValue("ambient", ambient)
+        apply_theme(choice, ambient)
+        self.centralWidget().update()
+        for index in range(self.tabs.count()):
+            self.tabs.setTabIcon(index, nav_icon(index))
+
     def build_session(self):
         page = QWidget()
         layout = QVBoxLayout(page)
         layout.setContentsMargins(0, 20, 0, 0)
         layout.setSpacing(16)
-        layout.addWidget(label("Make time for your story.", "title"))
-        description = label("Start a session, write in your favorite editor, then share your progress.", "muted")
-        description.setWordWrap(True)
-        layout.addWidget(description)
+        # FOCAL: session timer; comfortable density, opaque content surface.
         row = QHBoxLayout()
-        self.choose = button("Choose writing file…", self.pick)
+        self.choose = button("Choose file…", self.pick)
         row.addWidget(self.choose)
         self.file_status = label("No document selected", "muted")
         row.addWidget(self.file_status, 1)
         layout.addLayout(row)
         options = QHBoxLayout()
-        options.addWidget(label("Session"))
+        options.addWidget(label("Type"))
         self.mode = QComboBox()
         self.mode.addItems(["Writing", "Revision"])
         self.mode.setAccessibleName("Session type")
         self.mode.currentTextChanged.connect(self.mode_changed)
         options.addWidget(self.mode)
-        options.addSpacing(18)
+        options.addSpacing(16)
         options.addWidget(label("Goal"))
         self.goal = QSpinBox()
         self.goal.setRange(1, 100000)
@@ -241,48 +264,45 @@ class Window(QMainWindow):
         panel = QFrame()
         panel.setObjectName("panel")
         body = QVBoxLayout(panel)
-        body.setContentsMargins(28, 22, 28, 24)
-        self.state_label = label("READY WHEN YOU ARE", "eyebrow")
+        body.setContentsMargins(24, 24, 24, 24)
+        self.state_label = label("Ready", "eyebrow")
         body.addWidget(self.state_label)
         self.time_label = label("00:00", "timer")
         body.addWidget(self.time_label)
         row = QHBoxLayout()
         self.words = label("+0", "number")
         self.percent = label("0%", "number")
-        for number, title in [(self.words, "NET WORDS"), (self.percent, "SESSION GOAL")]:
+        for number, title in [(self.words, "Net words"), (self.percent, "Goal")]:
             col = QVBoxLayout()
             col.addWidget(number)
             col.addWidget(label(title, "muted"))
             row.addLayout(col)
         body.addLayout(row)
-        body.addSpacing(14)
+        body.addSpacing(16)
         self.progress = QProgressBar()
         self.progress.setTextVisible(False)
         body.addWidget(self.progress)
         layout.addWidget(panel)
-        self.message = label("Save your document before starting. Progress updates whenever your editor saves this file.", "muted")
+        self.message = label("Save in your editor to update progress.", "muted")
         self.message.setWordWrap(True)
         layout.addWidget(self.message)
         row = QHBoxLayout()
         self.start = button("Start session", self.begin, True)
         self.pause_button = button("Pause", self.pause_resume)
-        self.done = button("Done — share progress", self.finish)
+        self.done = button("Finish session", self.finish)
         row.addWidget(self.start)
         row.addWidget(self.pause_button)
         row.addWidget(self.done)
         layout.addLayout(row)
-        note = label("Session time is a manual timer. Pause for breaks. Net words can be negative when editing.", "muted")
-        note.setWordWrap(True)
-        layout.addWidget(note)
         layout.addStretch()
-        self.tabs.addTab(page, "Session")
+        self.add_scroll_tab(page, "Session")
 
     def build_history(self):
         page = QWidget()
         layout = QVBoxLayout(page)
         layout.setContentsMargins(0, 20, 0, 0)
-        layout.setSpacing(18)
-        layout.addWidget(label("Every session adds up.", "title"))
+        layout.setSpacing(16)
+         # FOCAL: session history; goal details live in the review dialog.
         self.totals = label("", "muted")
         layout.addWidget(self.totals)
         filters = QHBoxLayout()
@@ -301,20 +321,42 @@ class Window(QMainWindow):
         self.table.setHorizontalHeaderLabels(["Started", "Session", "Time", "Net words", "Goal", "Result"])
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.table.verticalHeader().hide()
+        self.table.verticalHeader().setDefaultSectionSize(44)
+        self.table.setShowGrid(False)
+        self.table.setColumnHidden(4, True)
+        self.table.setColumnHidden(5, True)
         self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.table.doubleClicked.connect(self.share_selected)
         layout.addWidget(self.table)
-        self.empty = label("Your finished sessions will appear here. Start with a few minutes.", "muted")
+        self.empty = label("No sessions yet", "muted")
         layout.addWidget(self.empty)
         row = QHBoxLayout()
         self.review_button = button("Review session", self.share_selected, True)
         row.addWidget(self.review_button)
         row.addStretch()
-        row.addWidget(button("Delete history…", self.clear_history))
+        delete = button("Delete history…", self.clear_history)
+        delete.setObjectName("destructive")
+        row.addWidget(delete)
         layout.addLayout(row)
         self.tabs.addTab(page, "History")
+
+    def help_section(self, layout, title, detail):
+        heading = QToolButton()
+        heading.setText(title)
+        heading.setCheckable(True)
+        heading.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+        heading.setArrowType(Qt.ArrowType.RightArrow)
+        text = label(detail, "muted")
+        text.setWordWrap(True)
+        text.hide()
+        def expand(checked):
+            text.setVisible(checked)
+            heading.setArrowType(Qt.ArrowType.DownArrow if checked else Qt.ArrowType.RightArrow)
+        heading.toggled.connect(expand)
+        layout.addWidget(heading)
+        layout.addWidget(text)
 
     def build_formats(self):
         scroll = QScrollArea()
@@ -323,7 +365,7 @@ class Window(QMainWindow):
         layout = QVBoxLayout(page)
         layout.setContentsMargins(4, 20, 12, 12)
         layout.setSpacing(16)
-        layout.addWidget(label("One workflow. Many editors.", "title"))
+        layout.addWidget(label("Supported formats", "title"))
         for title, detail in [
             ("Screenplays", "Fade In (.fadein, .osf), Final Draft (.fdx), and Fountain (.fountain). WriterDuet, WriterSolo and other screenplay apps can supply a local FDX or Fountain export."),
             ("Documents", "Word, LibreOffice, OpenOffice, ONLYOFFICE and WPS through .docx, .odt, .fodt or .rtf. AbiWord through .abw and .zabw. Track the format your editor actually saves."),
@@ -332,20 +374,17 @@ class Window(QMainWindow):
             ("Cloud apps and project formats", "Google Docs, Notion, Scrivener, Ulysses, Pages and browser-based editors need an export to a supported local format. WriteWatch cannot see cloud-only edits, .gdoc shortcuts or proprietary project contents. Re-export to the same selected path to update progress."),
             ("What gets counted", "DOCX body text (including tables and inserted revisions), excluding deleted revisions and separate comments/headers/footers. ODT excludes annotations, tracked-change history and footnotes. Markdown excludes front matter, comments and link destinations; code text counts. Fountain excludes title metadata, notes, boneyards, section headings and synopses. EPUB counts linear text chapters. RTF counts extracted text. HTML strips markup, scripts and styles but does not interpret CSS visibility."),
         ]:
-            layout.addWidget(label(title, "eyebrow"))
-            text = label(detail, "muted")
-            text.setWordWrap(True)
-            layout.addWidget(text)
+            self.help_section(layout, title, detail)
         layout.addStretch()
         scroll.setWidget(page)
-        self.tabs.addTab(scroll, "Formats & apps")
+        self.tabs.addTab(scroll, "Formats")
 
     def build_privacy(self):
         page = QWidget()
         layout = QVBoxLayout(page)
         layout.setContentsMargins(0, 20, 0, 0)
         layout.setSpacing(20)
-        layout.addWidget(label("Your story stays with you.", "title"))
+        layout.addWidget(label("Privacy", "section"))
         for title, text in [
             ("Private by design", "No accounts, analytics, uploads, keyboard recording or automatic posts. The selected document is opened read-only on this computer."),
             ("Optional updates", "Automatic updates contact GitHub for release metadata and app downloads. GitHub receives normal connection information such as your IP address. No document or session data is sent. Turn automatic checks off in Updates."),
@@ -354,12 +393,9 @@ class Window(QMainWindow):
             ("You control the clock", "Start / Pause / Done controls session time. It does not detect typing or focus. Edits saved while paused are excluded when you resume. A long system suspension pauses the timer. Save before pausing or finishing."),
             ("Share on your terms", "Copy sends only the displayed summary to your system clipboard. Save image exports the metrics shown on the card. Your clipboard manager or clipboard sync may retain copied summaries."),
         ]:
-            layout.addWidget(label(title, "eyebrow"))
-            detail = label(text, "muted")
-            detail.setWordWrap(True)
-            layout.addWidget(detail)
+            self.help_section(layout, title, text)
         layout.addStretch()
-        self.tabs.addTab(page, "Privacy & how it works")
+        self.add_scroll_tab(page, "Privacy")
 
     def mode_changed(self, mode):
         self.goal.setMaximum(1440 if mode == "Revision" else 100000)
@@ -370,7 +406,7 @@ class Window(QMainWindow):
         path, _ = QFileDialog.getOpenFileName(self, "Choose a saved writing file", "", file_filter())
         if path:
             self.path = Path(path)
-            self.file_status.setText(format_name(self.path) + " selected · filename kept private")
+            self.file_status.setText(format_name(self.path) + " selected")
             self.update_view()
 
     def persist(self):
@@ -390,7 +426,7 @@ class Window(QMainWindow):
         try:
             self.tracker = Tracker(self.path, self.mode.currentText(), 0 if self.skip_goal.isChecked() else self.goal.value())
             if self.persist():
-                self.message.setText("Session running. Save in your editor to update your progress.")
+                self.message.setText("Save in your editor to update progress.")
         except ScriptError as error:
             QMessageBox.warning(self, "Document unavailable", str(error))
         self.update_view()
@@ -402,9 +438,9 @@ class Window(QMainWindow):
         try:
             self.tracker.observe()
             if self.tracker.session.status == "running":
-                self.message.setText("Reading saved progress every 2 seconds · save in your editor before finishing.")
+                self.message.setText("Save in your editor before finishing.")
             else:
-                self.message.setText("Paused. Resume when ready; changes saved during this pause are excluded.")
+                self.message.setText("Edits saved while paused are excluded.")
         except ScriptError as error:
             self.message.setText(str(error) + " Timer continues; last good count retained.")
         self.persist()
@@ -437,7 +473,7 @@ class Window(QMainWindow):
         self.tracker = None
         self.refresh_history()
         self.update_view()
-        self.message.setText("Session saved. Ready for the next one.")
+        self.message.setText("Session saved")
         ShareDialog(session, self).exec()
 
     def update_view(self):
@@ -446,12 +482,18 @@ class Window(QMainWindow):
             widget.setEnabled(not active)
         self.goal.setEnabled(not active and not self.skip_goal.isChecked())
         self.start.setEnabled(not active and self.path is not None)
+        self.start.setVisible(not active)
+        self.done.setVisible(active)
+        self.done.setObjectName("primary")
+        self.done.style().unpolish(self.done)
+        self.done.style().polish(self.done)
+        self.pause_button.setVisible(active)
         self.pause_button.setEnabled(active)
         self.done.setEnabled(active)
         session = self.tracker.session if active else None
         paused = active and session.status == "paused"
         self.pause_button.setText("Resume" if paused else "Pause")
-        self.state_label.setText("PAUSED" if paused else "SESSION IN PROGRESS" if active else "READY WHEN YOU ARE")
+        self.state_label.setText("Paused" if paused else "Writing" if active else "Ready")
         seconds = int(session.seconds) if active else 0
         minutes, seconds = divmod(seconds, 60)
         self.time_label.setText(f"{minutes:02d}:{seconds:02d}")
@@ -480,8 +522,11 @@ class Window(QMainWindow):
             values = [date, session.mode + (" (interrupted)" if session.status == "interrupted" else ""),
                       f"{minutes}m {seconds:02d}s", f"{session.net:+,}", session.goal_label, session.goal_result]
             for col, value in enumerate(values):
-                self.table.setItem(row, col, QTableWidgetItem(value))
-        self.empty.setText("No sessions match these filters." if all_sessions else "Your finished sessions will appear here. Start with a few minutes.")
+                item = QTableWidgetItem(value)
+                if col in (2, 3):
+                    item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+                self.table.setItem(row, col, item)
+        self.empty.setText("No matching sessions" if all_sessions else "No sessions yet")
         self.empty.setVisible(not self.history)
         self.review_button.setEnabled(bool(self.history))
         today = datetime.now().date()
@@ -551,7 +596,7 @@ def main():
     except Exception:
         QMessageBox.critical(None, "History unavailable", "WriteWatch could not open local history. Check disk space and folder permissions.")
         return 1
-    window = Window(store, update_folder=None if os.environ.get("WRITEWATCH_DISABLE_UPDATES") == "1" else folder)
+    window = Window(store, update_folder=folder)
     window.show()
     result = app.exec()
     store.close()

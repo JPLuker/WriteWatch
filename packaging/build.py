@@ -32,7 +32,7 @@ if sys.platform == 'darwin':
     icon_path = assets / 'writewatch.icns'
     subprocess.run(['iconutil', '-c', 'icns', str(iconset), '-o', str(icon_path)], check=True)
 command = [sys.executable, '-m', 'PyInstaller', '--noconfirm', '--clean', '--windowed',
-           '--name', 'WriteWatch', '--icon', str(icon_path), '--collect-data', 'defusedxml']
+           '--name', 'WriteWatch', '--icon', str(icon_path), '--collect-data', 'defusedxml', '--collect-data', 'writewatch']
 if sys.platform == 'darwin':
     command += ['--osx-bundle-identifier', 'com.jpluker.writewatch', '--target-arch', platform.machine()]
 subprocess.run(command + ['main.py'], check=True)

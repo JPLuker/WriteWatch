@@ -99,7 +99,7 @@ class UpdateTests(unittest.TestCase):
                 ready, errors = [], []
                 worker.ready.connect(lambda path, asset: ready.append(path))
                 worker.failed.connect(errors.append)
-                with patch('writewatch.updates.opener') as client:
+                with patch('writewatch.updates.opener') as client, patch('writewatch.updates.__version__', '0.4.0'):
                     client.return_value.open.side_effect = [io.BytesIO(json.dumps([item]).encode()), io.BytesIO(data)]
                     worker.run()
                 self.assertEqual(bool(ready), success)

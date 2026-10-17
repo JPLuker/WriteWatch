@@ -109,3 +109,7 @@ When **Update ready** appears, finish your session and select **Restart to Updat
 Run an AppImage from a writable folder. On Mac, first move WriteWatch out of the DMG into a writable Applications folder; disk-image and App Translocation launches cannot update themselves. Source and Linux tar builds use manual installation. macOS builds remain ad-hoc signed, not notarized. Updates do not bypass macOS security settings. Installation errors are recorded in `updates/last-update.log` in the app data folder.
 
 Set `WRITEWATCH_DISABLE_UPDATES=1` to disable the updater completely, including network access, for managed deployments and tests.
+
+## Appearance
+
+WriteWatch follows [DESIGN.md](DESIGN.md). **Settings** offers System (default), Light and Dark themes, plus an ambient-background toggle. Qt uses the design system’s opaque material fallback and static ambient light. Format and privacy details expand on demand; history goal details live in session review. Update controls are now in Settings.

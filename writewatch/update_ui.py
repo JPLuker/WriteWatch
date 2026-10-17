@@ -3,7 +3,7 @@ from pathlib import Path
 
 from PySide6.QtCore import QSettings, QTimer, QUrl, Qt
 from PySide6.QtGui import QDesktopServices
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QLabel, QPushButton, QCheckBox, QMessageBox
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QLabel, QPushButton, QCheckBox, QMessageBox, QProgressBar
 from . import __version__
 from .updates import installation, UpdateWorker, install_update, RELEASES
 
@@ -18,35 +18,39 @@ class UpdatesPanel(QWidget):
         self.pending = None
         self.settings = QSettings(str(Path(folder) / 'updates.ini'), QSettings.Format.IniFormat)
         layout = QVBoxLayout(self)
-        title = QLabel(f'WriteWatch {__version__}')
-        title.setObjectName('title')
+        title = QLabel('Updates')
+        title.setObjectName('section')
         layout.addWidget(title)
-        explanation = QLabel('Updates check GitHub and download new releases in the background, including preview releases. '
-                             'No writing files or session statistics are sent. Finish your session before restarting to update.')
-        explanation.setWordWrap(True)
-        layout.addWidget(explanation)
         self.automatic = QCheckBox('Automatically check and download updates')
         self.automatic.setChecked(self.settings.value('automatic', True, type=bool))
         self.automatic.toggled.connect(self.preference_changed)
         layout.addWidget(self.automatic)
-        self.status = QLabel('Ready to check for updates.')
+        self.status = QLabel('')
         self.status.setTextFormat(Qt.TextFormat.PlainText)
         self.status.setWordWrap(True)
         layout.addWidget(self.status)
+        self.progress = QProgressBar()
+        self.progress.setTextVisible(False)
+        self.progress.hide()
+        layout.addWidget(self.progress)
+        self.cancel_button = QPushButton('Cancel download')
+        self.cancel_button.clicked.connect(self.cancel_download)
+        self.cancel_button.hide()
+        layout.addWidget(self.cancel_button)
         self.check = QPushButton('Check for updates')
         self.check.clicked.connect(self.check_now)
         layout.addWidget(self.check)
-        self.restart = QPushButton('Restart to Update')
+        self.restart = QPushButton('Restart to update')
         self.restart.setEnabled(False)
         self.restart.clicked.connect(self.apply)
         layout.addWidget(self.restart)
-        releases = QPushButton('View releases / install manually')
+        releases = QPushButton('View releases')
         releases.clicked.connect(lambda: QDesktopServices.openUrl(QUrl(RELEASES)))
         layout.addWidget(releases)
         layout.addStretch()
         if not self.installation:
-            self.status.setText('Automatic installation is available for the Windows app, Linux AppImage and installed macOS app. '
-                                'For source or Linux tar builds, install manually. On macOS, move the app out of the disk image first.')
+            self.status.setText('Install updates manually for this copy.')
+            self.status.setToolTip('Source and Linux tar builds require manual updates. On Mac, move the app out of the disk image first.')
             self.check.setEnabled(False)
             self.automatic.setEnabled(False)
         self.timer = QTimer(self)
@@ -71,13 +75,30 @@ class UpdatesPanel(QWidget):
         self.check.setEnabled(False)
         worker = UpdateWorker(self.installation, self.folder, self)
         self.worker = worker
-        worker.status.connect(self.status.setText)
+        worker.status.connect(self.report_status)
+        worker.progress.connect(self.report_progress)
+        self.cancel_button.show()
         worker.failed.connect(self.status.setText)
         worker.ready.connect(self.downloaded)
         worker.finished.connect(self.finished)
         worker.start()
 
+    def cancel_download(self):
+        if self.worker:
+            self.worker.cancel.set()
+            self.status.setText('Cancelling…')
+
+    def report_status(self, text):
+        self.status.setText(text)
+
+    def report_progress(self, count, total):
+        self.progress.show()
+        self.progress.setValue(count * 100 // total)
+        self.status.setText(f'{count / 1048576:.0f} / {total / 1048576:.0f} MB')
+
     def finished(self):
+        self.cancel_button.hide()
+        self.progress.hide()
         self.check.setEnabled(not self.pending)
         if self.worker.cancel.is_set():
             self.status.setText('Update check cancelled.')
@@ -86,15 +107,18 @@ class UpdatesPanel(QWidget):
 
     def downloaded(self, path, asset):
         self.pending = (path, asset)
-        self.status.setText(f"Version {asset['release_version']} downloaded and verified. Ready when you are.")
+        self.status.setText(f"Version {asset['release_version']} ready")
+        self.restart.setObjectName('primary')
+        self.restart.style().unpolish(self.restart)
+        self.restart.style().polish(self.restart)
         self.restart.setEnabled(True)
-        self.window.tabs.setTabText(self.window.tabs.indexOf(self), 'Update ready')
+        self.window.tabs.setTabText(self.window.tabs.indexOf(getattr(self.window, 'settings_tab', self)), 'Update ready')
 
     def apply(self):
         if not self.pending:
             return
         if self.window.tracker:
-            QMessageBox.information(self, 'Finish your session first', 'Use Done to save your session before restarting to update.')
+            QMessageBox.information(self, 'Finish your session first', 'Finish your session before restarting to update.')
             return
         if self.worker and self.worker.isRunning():
             return
@@ -109,6 +133,6 @@ class UpdatesPanel(QWidget):
         if self.worker and self.worker.isRunning():
             self.worker.cancel.set()
             self.status.setText('Stopping download. Close again in a moment.')
-            self.window.tabs.setCurrentWidget(self)
+            self.window.tabs.setCurrentWidget(getattr(self.window, 'settings_tab', self))
             return False
         return True

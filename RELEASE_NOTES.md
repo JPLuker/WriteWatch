@@ -1,9 +1,12 @@
-# WriteWatch v0.4.0 — optional automatic updates
+# WriteWatch v0.5.0 — Aurora Glass design
 
-- Background checks and verified downloads from public GitHub releases, including previews.
-- Updates tab with an automatic-check off switch and manual checks.
-- Restart to Update for Windows installers/portable builds, Linux AppImages, and installed macOS apps. Active sessions must be finished first.
-- Previous app backups for portable, AppImage and Mac updates. History and goals stay in their existing data folder.
-- Privacy details now describe update requests: no writing or session information is sent.
+- Floating pill navigation, rounded surfaces, ambient color and a quieter session screen based on DESIGN.md.
+- System, light and dark themes, with an optional ambient background.
+- Settings now holds appearance, updates, version and attribution.
+- Four-column history with goal details available in session review.
+- Expandable format and privacy help, shorter labels and refreshed share images.
+- Visible keyboard focus, contrast checks, scrollable small-window pages, and download progress with cancellation.
 
-**Install this version manually once** to receive future updates inside WriteWatch. macOS apps must be moved out of the DMG before updating. Source and Linux tar builds require manual updates. Mac builds require macOS 15+ and are ad-hoc signed, not notarized. Linux builds target Ubuntu 24.04 / glibc 2.39 or newer.
+Existing sessions and goals are preserved. If you have v0.4.0, use its Updates tab to download this release. Older versions require a manual installation.
+
+Qt uses opaque surfaces rather than simulated backdrop blur. macOS requires version 15+; builds are ad-hoc signed, not notarized. Linux builds target Ubuntu 24.04 / glibc 2.39 or newer.

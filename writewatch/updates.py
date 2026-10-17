@@ -113,6 +113,7 @@ def verify(path, asset):
 
 class UpdateWorker(QThread):
     status = Signal(str)
+    progress = Signal(int, int)
     ready = Signal(object, object)
     failed = Signal(str)
 
@@ -134,7 +135,7 @@ class UpdateWorker(QThread):
             if self.cancel.is_set():
                 return
             if not asset:
-                self.status.emit(f'WriteWatch {__version__} is up to date.')
+                self.status.emit('Up to date')
                 return
             self.folder.mkdir(parents=True, exist_ok=True)
             destination = self.folder / asset['name']
@@ -149,7 +150,7 @@ class UpdateWorker(QThread):
                     if count > asset['size']:
                         raise ValueError('Download exceeds expected size.')
                     output.write(block)
-                    self.status.emit(f"Downloading {asset['release_version']}… {count * 100 // asset['size']}%")
+                    self.progress.emit(count, asset["size"])
             if self.cancel.is_set():
                 return
             verify(partial, asset)
