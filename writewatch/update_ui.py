@@ -112,6 +112,9 @@ class UpdatesPanel(QWidget):
         self.restart.style().unpolish(self.restart)
         self.restart.style().polish(self.restart)
         self.restart.setEnabled(True)
+        self.window.menu_button.setToolTip("Menu — update ready")
+        self.window.menu_button.setText("Update ready")
+        self.window.menu_button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
         self.window.tabs.setTabText(self.window.tabs.indexOf(getattr(self.window, 'settings_tab', self)), 'Update ready')
 
     def apply(self):

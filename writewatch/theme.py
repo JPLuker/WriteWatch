@@ -149,6 +149,9 @@ def nav_icon(kind):
     elif kind == 3:
         p.drawRoundedRect(QRectF(5, 10, 14, 11), 2, 2); p.drawArc(QRectF(8, 2, 8, 14), 0, 180*16)
         p.drawLine(12, 14, 12, 17)
+    elif kind == 5:
+        for y in (6, 12, 18):
+            p.drawLine(4, y, 20, y)
     else:
         for y, x in [(6, 9), (12, 15), (18, 9)]:
             p.drawLine(4, y, 20, y); p.setBrush(QColor(colors()['surface']));p.drawEllipse(QRectF(x-2, y-2, 4, 4))

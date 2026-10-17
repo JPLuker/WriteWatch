@@ -113,3 +113,7 @@ Set `WRITEWATCH_DISABLE_UPDATES=1` to disable the updater completely, including 
 ## Appearance
 
 WriteWatch follows [DESIGN.md](DESIGN.md). **Settings** offers System (default), Light and Dark themes, plus an ambient-background toggle. Qt uses the design system’s opaque material fallback and static ambient light. Format and privacy details expand on demand; history goal details live in session review. Update controls are now in Settings.
+
+### Session workflow
+
+Choose a file, session type and goal (or Skip goal), then start. Setup is replaced by the active session view until you finish. The top-right menu opens Session, History or Settings. Formats and Privacy are in **Settings → About WriteWatch**. Navigating away does not pause or end a session.

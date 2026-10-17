@@ -38,6 +38,14 @@ class UiTests(unittest.TestCase):
             window.update_view()
             window.start.click()
             self.assertIsNotNone(window.tracker)
+            self.assertTrue(window.setup_panel.isHidden())
+            self.assertFalse(window.active_panel.isHidden())
+            self.assertEqual(window.tabs.count(), 3)
+            self.assertTrue(window.tabs.tabBar().isHidden())
+            window.navigation.actions()[1].trigger()
+            self.assertEqual(window.tabs.currentIndex(), 1)
+            self.assertIsNotNone(window.tracker)
+            window.navigation.actions()[0].trigger()
             write_script(script, 'PRIVATE CONTENT plus more words')
             window.poll()
             self.assertEqual(window.words.text(), '+3')
@@ -47,6 +55,8 @@ class UiTests(unittest.TestCase):
             with patch.object(ShareDialog, 'exec', return_value=0):
                 window.done.click()
             self.assertIsNone(window.tracker)
+            self.assertFalse(window.setup_panel.isHidden())
+            self.assertTrue(window.active_panel.isHidden())
             self.assertEqual(len(store.history()), 1)
             session = store.history()[0]
             dialog = ShareDialog(session, window)

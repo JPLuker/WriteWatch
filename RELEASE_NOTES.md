@@ -1,12 +1,10 @@
-# WriteWatch v0.5.0 — Aurora Glass design
+# WriteWatch v0.6.0 — simpler sessions
 
-- Floating pill navigation, rounded surfaces, ambient color and a quieter session screen based on DESIGN.md.
-- System, light and dark themes, with an optional ambient background.
-- Settings now holds appearance, updates, version and attribution.
-- Four-column history with goal details available in session review.
-- Expandable format and privacy help, shorter labels and refreshed share images.
-- Visible keyboard focus, contrast checks, scrollable small-window pages, and download progress with cancellation.
+- A dedicated setup view for the writing file, session type and optional goal.
+- Start switches to an active view with time, words, goal progress, Pause and Finish.
+- Finishing saves the session, opens sharing and returns to setup.
+- A top-right menu replaces the navigation tabs: Session, History and Settings.
+- Formats and Privacy now live in About WriteWatch under Settings.
+- Update-ready status remains visible at the menu. Existing history is preserved.
 
-Existing sessions and goals are preserved. If you have v0.4.0, use its Updates tab to download this release. Older versions require a manual installation.
-
-Qt uses opaque surfaces rather than simulated backdrop blur. macOS requires version 15+; builds are ad-hoc signed, not notarized. Linux builds target Ubuntu 24.04 / glibc 2.39 or newer.
+Install through the updater in v0.4.0 or later, or download the matching package. macOS requires 15+ and remains ad-hoc signed. Linux builds require glibc 2.39 or newer.

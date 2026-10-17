@@ -11,7 +11,7 @@ from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QPushButton, QFileDialog, QComboBox, QSpinBox, QFrame, QProgressBar,
     QTabWidget, QTableWidget, QTableWidgetItem, QHeaderView, QMessageBox,
-    QDialog, QPlainTextEdit, QAbstractItemView, QScrollArea, QCheckBox, QToolButton,
+    QDialog, QPlainTextEdit, QAbstractItemView, QScrollArea, QCheckBox, QToolButton, QMenu, QToolBox,
 )
 from . import __version__
 from .core import ScriptError, Session, Store, Tracker
@@ -157,15 +157,29 @@ class Window(QMainWindow):
         top = QHBoxLayout()
         top.addWidget(label("WriteWatch", "brand"))
         top.addStretch()
+        self.menu_button = QToolButton()
+        self.menu_button.setIcon(nav_icon(5))
+        self.menu_button.setAccessibleName("Navigation menu")
+        self.menu_button.setToolTip("Menu")
+        self.menu_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        self.navigation = QMenu(self.menu_button)
+        self.menu_button.setMenu(self.navigation)
+        top.addWidget(self.menu_button)
         layout.addLayout(top)
         self.tabs = QTabWidget()
-        self.tabs.setTabBar(FloatingTabs())
+        self.tabs.tabBar().hide()
         layout.addWidget(self.tabs)
         self.build_session()
         self.build_history()
         self.build_formats()
         self.build_privacy()
+        self.about_pages = [self.tabs.widget(2), self.tabs.widget(3)]
+        self.tabs.removeTab(3)
+        self.tabs.removeTab(2)
         self.build_settings(update_folder)
+        for index, title in enumerate(("Session", "History", "Settings")):
+            action = self.navigation.addAction(title)
+            action.triggered.connect(lambda checked=False, i=index: self.tabs.setCurrentIndex(i))
         for index in range(self.tabs.count()):
             self.tabs.setTabIcon(index, nav_icon(index))
         self.timer = QTimer(self)
@@ -212,11 +226,30 @@ class Window(QMainWindow):
             self.updates = UpdatesPanel(self, folder)
             layout.addWidget(self.updates)
         layout.addStretch()
-        layout.addWidget(label(f"WriteWatch {__version__}\nMade by Joseph Luker", "muted"))
+        layout.addWidget(button("About WriteWatch", self.show_about))
         self.add_scroll_tab(page, "Settings")
         self.settings_tab = self.tabs.widget(self.tabs.count() - 1)
         if folder is not None:
             self.change_appearance()
+
+    def show_about(self):
+        dialog = QDialog(self)
+        dialog.setWindowTitle("About WriteWatch")
+        dialog.resize(640, 540)
+        layout = QVBoxLayout(dialog)
+        layout.setContentsMargins(24, 24, 24, 24)
+        layout.addWidget(label(f"WriteWatch {__version__}", "section"))
+        layout.addWidget(label("Made by Joseph Luker", "muted"))
+        sections = QToolBox()
+        for page, title in zip(self.about_pages, ("Formats", "Privacy")):
+            sections.addItem(page, title)
+        layout.addWidget(sections)
+        layout.addWidget(button("Close", dialog.accept))
+        dialog.exec()
+        for page in self.about_pages:
+            page.setParent(self)
+            page.hide()
+        dialog.deleteLater()
 
     def change_appearance(self, *_):
         choice, ambient = self.theme_choice.currentText(), self.ambient_choice.isChecked()
@@ -225,6 +258,7 @@ class Window(QMainWindow):
             self.preferences.setValue("ambient", ambient)
         apply_theme(choice, ambient)
         self.centralWidget().update()
+        self.menu_button.setIcon(nav_icon(5))
         for index in range(self.tabs.count()):
             self.tabs.setTabIcon(index, nav_icon(index))
 
@@ -233,35 +267,42 @@ class Window(QMainWindow):
         layout = QVBoxLayout(page)
         layout.setContentsMargins(0, 20, 0, 0)
         layout.setSpacing(16)
-        # FOCAL: session timer; comfortable density, opaque content surface.
+        # FOCAL: Start in setup; timer during an active session.
+        self.setup_panel = QFrame()
+        self.setup_panel.setObjectName("panel")
+        setup = QVBoxLayout(self.setup_panel)
+        setup.setContentsMargins(24, 24, 24, 24)
+        setup.setSpacing(16)
+        setup.addWidget(label("New session", "title"))
+        setup.addWidget(label("Writing file", "eyebrow"))
         row = QHBoxLayout()
         self.choose = button("Choose file…", self.pick)
         row.addWidget(self.choose)
         self.file_status = label("No document selected", "muted")
+        self.file_status.setWordWrap(True)
         row.addWidget(self.file_status, 1)
-        layout.addLayout(row)
-        options = QHBoxLayout()
-        options.addWidget(label("Type"))
+        setup.addLayout(row)
+        setup.addWidget(label("Session type", "eyebrow"))
         self.mode = QComboBox()
         self.mode.addItems(["Writing", "Revision"])
         self.mode.setAccessibleName("Session type")
         self.mode.currentTextChanged.connect(self.mode_changed)
-        options.addWidget(self.mode)
-        options.addSpacing(16)
-        options.addWidget(label("Goal"))
+        setup.addWidget(self.mode)
+        setup.addWidget(label("Session goal", "eyebrow"))
         self.goal = QSpinBox()
         self.goal.setRange(1, 100000)
         self.goal.setValue(500)
         self.goal.setSuffix(" net words")
         self.goal.setAccessibleName("Session goal")
-        options.addWidget(self.goal)
+        setup.addWidget(self.goal)
         self.skip_goal = QCheckBox("Skip goal")
-        self.skip_goal.setToolTip("Track time and words without a target for this session.")
         self.skip_goal.toggled.connect(lambda _: self.update_view())
-        options.addWidget(self.skip_goal)
-        options.addStretch()
-        layout.addLayout(options)
+        setup.addWidget(self.skip_goal)
+        self.start = button("Start session", self.begin, True)
+        setup.addWidget(self.start)
+        layout.addWidget(self.setup_panel)
         panel = QFrame()
+        self.active_panel = panel
         panel.setObjectName("panel")
         body = QVBoxLayout(panel)
         body.setContentsMargins(24, 24, 24, 24)
@@ -272,10 +313,11 @@ class Window(QMainWindow):
         row = QHBoxLayout()
         self.words = label("+0", "number")
         self.percent = label("0%", "number")
+        self.goal_caption = label("Goal", "muted")
         for number, title in [(self.words, "Net words"), (self.percent, "Goal")]:
             col = QVBoxLayout()
             col.addWidget(number)
-            col.addWidget(label(title, "muted"))
+            col.addWidget(self.goal_caption if number is self.percent else label(title, "muted"))
             row.addLayout(col)
         body.addLayout(row)
         body.addSpacing(16)
@@ -287,10 +329,8 @@ class Window(QMainWindow):
         self.message.setWordWrap(True)
         layout.addWidget(self.message)
         row = QHBoxLayout()
-        self.start = button("Start session", self.begin, True)
         self.pause_button = button("Pause", self.pause_resume)
         self.done = button("Finish session", self.finish)
-        row.addWidget(self.start)
         row.addWidget(self.pause_button)
         row.addWidget(self.done)
         layout.addLayout(row)
@@ -478,6 +518,9 @@ class Window(QMainWindow):
 
     def update_view(self):
         active = self.tracker is not None
+        self.setup_panel.setVisible(not active)
+        self.active_panel.setVisible(active)
+        self.goal.setVisible(not self.skip_goal.isChecked())
         for widget in (self.choose, self.mode, self.skip_goal):
             widget.setEnabled(not active)
         self.goal.setEnabled(not active and not self.skip_goal.isChecked())
@@ -493,7 +536,7 @@ class Window(QMainWindow):
         session = self.tracker.session if active else None
         paused = active and session.status == "paused"
         self.pause_button.setText("Resume" if paused else "Pause")
-        self.state_label.setText("Paused" if paused else "Writing" if active else "Ready")
+        self.state_label.setText("Paused" if paused else session.mode if active else "Ready")
         seconds = int(session.seconds) if active else 0
         minutes, seconds = divmod(seconds, 60)
         self.time_label.setText(f"{minutes:02d}:{seconds:02d}")
@@ -502,6 +545,9 @@ class Window(QMainWindow):
         has_goal = bool(session.goal) if active else not self.skip_goal.isChecked()
         self.percent.setText(f"{percent}%" if has_goal else "—")
         self.percent.setToolTip("No goal set" if not has_goal else "Progress toward this session's goal")
+        self.goal_caption.setText(f"Goal · {session.goal_label}" if active and has_goal else "Goal")
+        self.percent.setVisible(has_goal)
+        self.goal_caption.setVisible(has_goal)
         self.progress.setVisible(has_goal)
         self.progress.setValue(percent)
 
