@@ -288,7 +288,13 @@ class Window(QMainWindow):
         self.mode.setAccessibleName("Session type")
         self.mode.currentTextChanged.connect(self.mode_changed)
         setup.addWidget(self.mode)
-        setup.addWidget(label("Session goal", "eyebrow"))
+        self.goal_dialog = QDialog(self)
+        self.goal_dialog.setWindowTitle("Goal settings")
+        self.goal_dialog.resize(440, 240)
+        goal_settings = QVBoxLayout(self.goal_dialog)
+        goal_settings.setContentsMargins(24, 24, 24, 24)
+        goal_settings.setSpacing(16)
+        goal_settings.addWidget(label("Session goal", "section"))
         self.goal = QSpinBox()
         self.goal.setRange(1, 100000)
         self.goal.setValue(500)
@@ -297,16 +303,27 @@ class Window(QMainWindow):
         self.goal.setMaximumWidth(200)
         self.skip_goal = GoalChoice()
         self.skip_goal.toggled.connect(lambda _: self.update_view())
-        setup.addWidget(self.skip_goal)
+        goal_settings.addWidget(self.skip_goal)
         self.goal_row = QWidget()
         goal_layout = QHBoxLayout(self.goal_row)
         goal_layout.setContentsMargins(0, 0, 0, 0)
         goal_layout.addWidget(label("Target", "muted"))
         goal_layout.addWidget(self.goal)
         goal_layout.addStretch()
-        setup.addWidget(self.goal_row)
+        goal_settings.addWidget(self.goal_row)
+        dialog_actions = QHBoxLayout()
+        dialog_actions.addStretch()
+        dialog_actions.addWidget(button("Cancel", self.goal_dialog.reject))
+        dialog_actions.addWidget(button("Save goal", self.goal_dialog.accept, True))
+        goal_settings.addLayout(dialog_actions)
+        setup.addSpacing(8)
+        actions = QHBoxLayout()
+        self.goal_settings_button = button("Goal settings", self.edit_goal)
+        actions.addWidget(self.goal_settings_button)
+        actions.addStretch()
         self.start = button("Start session", self.begin, True)
-        setup.addWidget(self.start)
+        actions.addWidget(self.start)
+        setup.addLayout(actions)
         layout.addWidget(self.setup_panel)
         panel = QFrame()
         self.active_panel = panel
@@ -343,6 +360,13 @@ class Window(QMainWindow):
         layout.addLayout(row)
         layout.addStretch()
         self.add_scroll_tab(page, "Session")
+
+    def edit_goal(self):
+        previous = (self.skip_goal.isChecked(), self.goal.value())
+        if self.goal_dialog.exec() != QDialog.DialogCode.Accepted:
+            self.skip_goal.setChecked(previous[0])
+            self.goal.setValue(previous[1])
+        self.update_view()
 
     def build_history(self):
         page = QWidget()
@@ -448,6 +472,7 @@ class Window(QMainWindow):
         self.goal.setMaximum(1440 if mode == "Revision" else 100000)
         self.goal.setSuffix(" minutes" if mode == "Revision" else " net words")
         self.goal.setValue(30 if mode == "Revision" else 500)
+        self.update_view()
 
     def pick(self):
         path, _ = QFileDialog.getOpenFileName(self, "Choose a saved writing file", "", file_filter())
@@ -528,6 +553,9 @@ class Window(QMainWindow):
         self.setup_panel.setVisible(not active)
         self.active_panel.setVisible(active)
         self.goal_row.setVisible(not self.skip_goal.isChecked())
+        target = f"{self.goal.value():,} {'minutes' if self.mode.currentText() == 'Revision' else 'words'}"
+        self.goal_settings_button.setText("Goal settings" if self.skip_goal.isChecked() else f"Goal settings · {target}")
+        self.goal_settings_button.setToolTip("No goal" if self.skip_goal.isChecked() else target)
         for widget in (self.choose, self.mode, self.skip_goal):
             widget.setEnabled(not active)
         self.goal.setEnabled(not active and not self.skip_goal.isChecked())

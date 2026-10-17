@@ -6,7 +6,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from PySide6.QtCore import QCoreApplication, QEvent
+from PySide6.QtCore import QCoreApplication, QEvent, QTimer
 from PySide6.QtWidgets import QApplication
 from writewatch.core import Session, Store
 from writewatch.app import Window, ShareDialog, card
@@ -115,6 +115,30 @@ class GoalsHistoryTests(unittest.TestCase):
             self.assertEqual(window.goal.suffix(), ' net words')
             window.skip_goal.buttons['No goal'].click()
             self.assertTrue(window.goal_row.isHidden())
+            window.close()
+            store.close()
+
+    def test_goal_dialog_save_and_cancel(self):
+        with tempfile.TemporaryDirectory() as d:
+            store = Store(Path(d) / 'history.sqlite3')
+            window = Window(store)
+            def change_and_cancel():
+                window.skip_goal.setChecked(False)
+                window.goal.setValue(900)
+                window.goal_dialog.reject()
+            QTimer.singleShot(0, change_and_cancel)
+            window.edit_goal()
+            self.assertTrue(window.skip_goal.isChecked())
+            self.assertEqual(window.goal.value(), 500)
+            def change_and_save():
+                window.skip_goal.setChecked(False)
+                window.goal.setValue(750)
+                window.goal_dialog.accept()
+            QTimer.singleShot(0, change_and_save)
+            window.edit_goal()
+            self.assertFalse(window.skip_goal.isChecked())
+            self.assertIn('750 words', window.goal_settings_button.text())
+            self.assertFalse(window.goal_dialog.isVisible())
             window.close()
             store.close()
 

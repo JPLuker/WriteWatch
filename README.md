@@ -129,3 +129,5 @@ sudo apt install ./WriteWatch-0.6.1-amd64.deb
 WriteWatch appears in the application menu. Remove with `sudo apt remove writewatch`; personal history remains in your user data folder. Install a newer `.deb` the same way to upgrade. The `.deb` is managed by the system package manager and does not replace itself through the in-app updater. There is no apt repository configured for automatic upgrades. The AppImage remains available and supports in-app updates.
 
 Session setup now uses Writing / Revision and No goal / Set goal toggles. A target appears only for Set goal; writing targets count net words, revision targets count minutes.
+
+Goal controls are now under **Goal settings** at the bottom left of setup. Save applies the selected target; Cancel or Escape restores the previous choice. **Start session** stays on the bottom right.
