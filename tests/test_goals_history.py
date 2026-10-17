@@ -78,6 +78,7 @@ class GoalsHistoryTests(unittest.TestCase):
             write_script(script, 'one two')
             window.path = script
             window.skip_goal.setChecked(True)
+            window.update_view()
             self.assertFalse(window.goal.isEnabled())
             window.start.click()
             self.assertEqual(window.tracker.session.goal, 0)
@@ -94,6 +95,26 @@ class GoalsHistoryTests(unittest.TestCase):
                 self.assertEqual(dialog.call_args.args[0].net, 1)
             window.skip_goal.setChecked(False)
             self.assertTrue(window.goal.isEnabled())
+            window.close()
+            store.close()
+
+    def test_segmented_choices_update_goal_units(self):
+        with tempfile.TemporaryDirectory() as d:
+            store = Store(Path(d) / 'history.sqlite3')
+            window = Window(store)
+            self.assertTrue(window.skip_goal.isChecked())
+            self.assertTrue(window.goal_row.isHidden())
+            window.skip_goal.buttons['Set goal'].click()
+            self.assertFalse(window.goal_row.isHidden())
+            self.assertEqual(window.goal.value(), 500)
+            window.mode.buttons['Revision'].click()
+            self.assertEqual(window.mode.currentText(), 'Revision')
+            self.assertEqual(window.goal.value(), 30)
+            self.assertEqual(window.goal.suffix(), ' minutes')
+            window.mode.buttons['Writing'].click()
+            self.assertEqual(window.goal.suffix(), ' net words')
+            window.skip_goal.buttons['No goal'].click()
+            self.assertTrue(window.goal_row.isHidden())
             window.close()
             store.close()
 

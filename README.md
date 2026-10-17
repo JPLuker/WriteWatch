@@ -117,3 +117,15 @@ WriteWatch follows [DESIGN.md](DESIGN.md). **Settings** offers System (default),
 ### Session workflow
 
 Choose a file, session type and goal (or Skip goal), then start. Setup is replaced by the active session view until you finish. The top-right menu opens Session, History or Settings. Formats and Privacy are in **Settings → About WriteWatch**. Navigating away does not pause or end a session.
+
+### Linux installer (.deb)
+
+Use the `amd64.deb` download on Ubuntu 24.04 or newer compatible Debian-based systems (glibc 2.39+). Install with your software installer, or from the download folder:
+
+```bash
+sudo apt install ./WriteWatch-0.6.1-amd64.deb
+```
+
+WriteWatch appears in the application menu. Remove with `sudo apt remove writewatch`; personal history remains in your user data folder. Install a newer `.deb` the same way to upgrade. The `.deb` is managed by the system package manager and does not replace itself through the in-app updater. There is no apt repository configured for automatic upgrades. The AppImage remains available and supports in-app updates.
+
+Session setup now uses Writing / Revision and No goal / Set goal toggles. A target appears only for Set goal; writing targets count net words, revision targets count minutes.

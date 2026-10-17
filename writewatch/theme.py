@@ -36,6 +36,13 @@ QLabel#muted {{ color: {t['secondary']}; }}
 QLabel#eyebrow {{ color: {t['secondary']}; font-size: 14px; font-weight: 500; }}
 QLabel#number {{ font-size: 32px; font-weight: 600; }}
 QLabel#timer {{ font-size: 48px; font-weight: 600; }}
+QFrame#segments {{ background: {t['surface2']}; border-radius: 20px; }}
+QRadioButton#segment {{ background: transparent; color: {t['secondary']}; border: 2px solid transparent; border-radius: 14px; padding: 12px 16px; font-size: 14px; }}
+QRadioButton#segment::indicator {{ width: 0; height: 0; border: 0; background: transparent; image: none; }}
+QRadioButton#segment:checked {{ background: {t['surface']}; color: {t['accent']}; }}
+QRadioButton#segment:hover {{ background: {t['surface3']}; }}
+QRadioButton#segment:focus {{ border-color: {t['accent']}; }}
+QRadioButton#segment:disabled {{ color: {t['tertiary']}; }}
 QFrame#panel {{ background: {t['surface']}; border: none; border-radius: 28px; }}
 QPushButton {{ background: {t['surface2']}; border: 2px solid transparent; border-radius: 20px; padding: 8px 16px; min-height: 20px; font-size: 14px; font-weight: 500; }}
 QPushButton:hover {{ background: {t['surface3']}; }}

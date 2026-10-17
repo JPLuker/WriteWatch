@@ -16,6 +16,7 @@ from PySide6.QtWidgets import (
 from . import __version__
 from .core import ScriptError, Session, Store, Tracker
 from .formats import file_filter, format_name
+from .controls import SegmentedChoice, GoalChoice
 
 from .theme import AmbientCanvas, apply_theme, stylesheet, DARK, FloatingTabs, nav_icon
 STYLE = stylesheet(True)
@@ -283,8 +284,7 @@ class Window(QMainWindow):
         row.addWidget(self.file_status, 1)
         setup.addLayout(row)
         setup.addWidget(label("Session type", "eyebrow"))
-        self.mode = QComboBox()
-        self.mode.addItems(["Writing", "Revision"])
+        self.mode = SegmentedChoice(["Writing", "Revision"])
         self.mode.setAccessibleName("Session type")
         self.mode.currentTextChanged.connect(self.mode_changed)
         setup.addWidget(self.mode)
@@ -294,10 +294,17 @@ class Window(QMainWindow):
         self.goal.setValue(500)
         self.goal.setSuffix(" net words")
         self.goal.setAccessibleName("Session goal")
-        setup.addWidget(self.goal)
-        self.skip_goal = QCheckBox("Skip goal")
+        self.goal.setMaximumWidth(200)
+        self.skip_goal = GoalChoice()
         self.skip_goal.toggled.connect(lambda _: self.update_view())
         setup.addWidget(self.skip_goal)
+        self.goal_row = QWidget()
+        goal_layout = QHBoxLayout(self.goal_row)
+        goal_layout.setContentsMargins(0, 0, 0, 0)
+        goal_layout.addWidget(label("Target", "muted"))
+        goal_layout.addWidget(self.goal)
+        goal_layout.addStretch()
+        setup.addWidget(self.goal_row)
         self.start = button("Start session", self.begin, True)
         setup.addWidget(self.start)
         layout.addWidget(self.setup_panel)
@@ -520,7 +527,7 @@ class Window(QMainWindow):
         active = self.tracker is not None
         self.setup_panel.setVisible(not active)
         self.active_panel.setVisible(active)
-        self.goal.setVisible(not self.skip_goal.isChecked())
+        self.goal_row.setVisible(not self.skip_goal.isChecked())
         for widget in (self.choose, self.mode, self.skip_goal):
             widget.setEnabled(not active)
         self.goal.setEnabled(not active and not self.skip_goal.isChecked())

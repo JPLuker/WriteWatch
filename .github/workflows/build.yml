@@ -33,6 +33,14 @@ jobs:
       - name: Package Linux AppImage
         if: runner.os == 'Linux'
         run: bash packaging/appimage.sh
+      - name: Package and verify Debian installer
+        if: runner.os == 'Linux'
+        run: |
+          python packaging/deb.py
+          sudo apt-get install -y ./dist/*.deb
+          python packaging/smoke_deb.py
+          sudo apt-get remove -y writewatch
+          test ! -e /usr/bin/writewatch
       - name: Package Windows installer
         if: runner.os == 'Windows'
         shell: pwsh
@@ -49,6 +57,7 @@ jobs:
             dist/*.dmg
             dist/*.AppImage
             dist/*.tar.gz
+            dist/*.deb
           if-no-files-found: error
   release:
     if: github.event_name != 'pull_request'

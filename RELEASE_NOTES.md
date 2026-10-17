@@ -1,10 +1,8 @@
-# WriteWatch v0.6.0 — simpler sessions
+# WriteWatch v0.6.1 — session toggles and Linux installer
 
-- A dedicated setup view for the writing file, session type and optional goal.
-- Start switches to an active view with time, words, goal progress, Pause and Finish.
-- Finishing saves the session, opens sharing and returns to setup.
-- A top-right menu replaces the navigation tabs: Session, History and Settings.
-- Formats and Privacy now live in About WriteWatch under Settings.
-- Update-ready status remains visible at the menu. Existing history is preserved.
+- Writing / Revision is now a two-option toggle.
+- Goals default to No goal. Choose Set goal to enter a word or minute target.
+- Added an amd64 `.deb` installer alongside the AppImage, with an application-menu launcher and package-manager uninstall.
+- The Debian package is installed, launched and removed in Linux CI.
 
-Install through the updater in v0.4.0 or later, or download the matching package. macOS requires 15+ and remains ad-hoc signed. Linux builds require glibc 2.39 or newer.
+Linux packages require glibc 2.39+ (Ubuntu 24.04 baseline). Upgrade `.deb` installations by installing the newer package; in-app self-updates remain available for the AppImage. Windows and Mac downloads remain available. macOS requires 15+ and is ad-hoc signed, not notarized.
