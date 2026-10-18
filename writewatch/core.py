@@ -22,6 +22,18 @@ class Session:
     saves: int = 0
     status: str = "running"
 
+    goal_unit: str = ""
+    pages: float = 0
+    words_per_page: int = 250
+
+    @property
+    def unit(self):
+        return self.goal_unit or ("words" if self.mode == "Writing" else "minutes")
+
+    @property
+    def page_count(self):
+        return self.net / self.words_per_page if self.unit == "estimated_pages" else self.pages
+
     @classmethod
     def new(cls, mode: str, goal: int):
         if mode not in ("Writing", "Revision") or not 0 <= goal <= 100000:
@@ -32,14 +44,16 @@ class Session:
     def progress(self):
         if self.goal == 0:
             return 0.0
-        amount = max(0, self.net) if self.mode == "Writing" else self.seconds / 60
+        amount = {"words": max(0, self.net), "minutes": self.seconds / 60,
+                  "pages": self.pages, "estimated_pages": max(0, self.page_count)}[self.unit]
         return min(1.0, amount / self.goal)
 
     @property
     def goal_label(self):
         if not self.goal:
             return "No goal set"
-        return f"{self.goal:,} net words" if self.mode == "Writing" else f"{self.goal} minutes"
+        return f"{self.goal:,} " + {"words": "net words", "minutes": "minutes",
+                                  "pages": "pages", "estimated_pages": "estimated pages"}[self.unit]
 
     @property
     def goal_result(self):
@@ -53,8 +67,11 @@ class Session:
         date = datetime.fromisoformat(self.started).strftime("%b %d, %Y")
         minutes, seconds = divmod(int(self.seconds), 60)
         heading = "Session complete" if self.status == "done" else "Interrupted session"
-        lines = [f"WriteWatch · {date}", f"{self.mode} · {heading}",
+        lines = [f"WriteWatch · {date}", f"Revision · {heading}" if self.mode == "Revision" else heading,
                  f"Time: {minutes}m {seconds:02d}s · {self.net:+,} net words"]
+        if self.unit in ("pages", "estimated_pages"):
+            qualifier = "Estimated pages" if self.unit == "estimated_pages" else "Pages (self-reported)"
+            lines.append(f"{qualifier}: {self.page_count:,.1f}")
         if self.goal:
             lines += [f"Goal: {self.goal_label}", f"Goal progress: {round(self.progress * 100)}%"]
         return "\n".join(lines + ["#WriteWatch"])
@@ -128,19 +145,36 @@ class Store:
     """Explicit schema is also the persistence privacy allowlist."""
     def __init__(self, path: Path):
         path.parent.mkdir(parents=True, exist_ok=True)
+        self.path = path
         self.db = sqlite3.connect(path)
+        version = self.db.execute("PRAGMA user_version").fetchone()[0]
+        if version > 1:
+            self.db.close()
+            raise ValueError("This data was saved by a newer version. Update WriteWatch to open it.")
+        exists = self.db.execute("SELECT 1 FROM sqlite_master WHERE name='sessions'").fetchone()
+        if version == 0 and exists:
+            with sqlite3.connect(str(path) + ".backup-v0") as backup:
+                self.db.backup(backup)
+
         self.db.row_factory = sqlite3.Row
         self.db.execute("""CREATE TABLE IF NOT EXISTS sessions (
             id TEXT PRIMARY KEY, started TEXT NOT NULL, mode TEXT NOT NULL,
             goal INTEGER NOT NULL, seconds REAL NOT NULL, net INTEGER NOT NULL,
             saves INTEGER NOT NULL, status TEXT NOT NULL)""")
+        if version == 0:
+            with self.db:
+                self.db.execute("BEGIN IMMEDIATE")
+                self.db.execute("ALTER TABLE sessions ADD COLUMN goal_unit TEXT NOT NULL DEFAULT ''")
+                self.db.execute("ALTER TABLE sessions ADD COLUMN pages REAL NOT NULL DEFAULT 0")
+                self.db.execute("ALTER TABLE sessions ADD COLUMN words_per_page INTEGER NOT NULL DEFAULT 250")
+                self.db.execute("PRAGMA user_version=1")
         self.db.execute("UPDATE sessions SET status='interrupted' WHERE status IN ('running','paused')")
         self.db.commit()
 
     def save(self, session: Session):
         values = asdict(session)
         with self.db:
-            self.db.execute("INSERT OR REPLACE INTO sessions VALUES (:id,:started,:mode,:goal,:seconds,:net,:saves,:status)", values)
+            self.db.execute("INSERT OR REPLACE INTO sessions VALUES (:id,:started,:mode,:goal,:seconds,:net,:saves,:status,:goal_unit,:pages,:words_per_page)", values)
 
     def history(self):
         return [Session(**dict(row)) for row in self.db.execute(

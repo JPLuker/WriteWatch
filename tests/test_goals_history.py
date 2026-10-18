@@ -82,7 +82,7 @@ class GoalsHistoryTests(unittest.TestCase):
             self.assertFalse(window.goal.isEnabled())
             window.start.click()
             self.assertEqual(window.tracker.session.goal, 0)
-            self.assertFalse(window.skip_goal.isEnabled())
+            self.assertTrue(window.skip_goal.isEnabled())
             self.assertTrue(window.progress.isHidden())
             write_script(script, 'one two three')
             with patch.object(ShareDialog, 'exec', return_value=0):

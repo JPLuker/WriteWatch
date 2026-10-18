@@ -9,22 +9,24 @@ Download the latest **prerelease** from [Releases](https://github.com/JPLuker/Wr
 - **Windows x64:** run `WriteWatch-…-Windows-Setup.exe` (per-user installer), or extract the portable ZIP and run `WriteWatch.exe` inside its folder. Keep `_internal` alongside the executable. The initial builds are unsigned; Windows may show its unknown-publisher prompt.
 - **macOS 15+:** download the AppleSilicon DMG for M-series Macs or the Intel DMG for Intel Macs. Open it and drag WriteWatch into Applications. ZIP bundles are also available. These builds are ad-hoc signed for bundle integrity, but are **not Developer ID signed or notarized**. If the first launch is blocked, use System Settings → Privacy & Security → Open Anyway for this app. See [Mac installation notes](packaging/MAC_INSTALL.md).
 - **Linux x86_64:** make the AppImage executable in its Properties → Permissions and run it. If FUSE is unavailable, launch with `--appimage-extract-and-run`. Alternatively, extract the `.tar.gz` and run `WriteWatch/WriteWatch`. Targets Ubuntu 24.04 and similarly recent distributions (glibc 2.39+); Wayland and X11 use Qt. No keyboard hooks or compositor extensions.
-- Each main-branch build also provides downloads under [Actions](https://github.com/JPLuker/WriteWatch/actions). A successful main-branch build publishes a versioned prerelease automatically; bump the app version for each release.
+- Each main-branch build also provides downloads under [Actions](https://github.com/JPLuker/WriteWatch/actions). Main-branch builds provide development artifacts. Tagged builds prepare a draft release for validation before publication.
 
 ## Your first session
 
 1. Save your document in your editor.
-2. Open WriteWatch and **Choose writing file**. Selection stays in memory and is not saved to history.
-3. Pick **Writing** with a net-word goal, or **Revision** with a minute goal. Check **Skip goal** to track a session without a target.
-4. Click **Start session**, then write normally. WriteWatch checks your selected file every two seconds and parses it when it changes.
-5. Save before **Pause** or **Done**. Resume excludes changes saved during the pause.
-6. Click **Done — share progress**, then **Copy for writers group**. Paste it wherever you want. No automatic posting.
+2. Pick Writing or Revision, then **Open file**. Selecting a readable file starts the session immediately. Recent files appear here after the first successful selection.
+3. Use **Goal settings** before or during a session: Words, Pages, Minutes, or No goal. Changing a target does not reset progress.
+4. For Pages, choose **Enter pages** to record pages completed/reviewed yourself, or **Estimate** to divide net words by a configurable words-per-page value (default 250). Estimates are not your editor's pagination. Manual page totals can include rereading and revision without word-count growth.
+5. Save before **Pause** or **Finish session**. Resume excludes changes saved during the pause.
+6. Select **Copy**, then paste wherever you want. No automatic posting. Revision summaries retain their mode label; ordinary writing summaries omit it.
+
+Settings → Files lets you disable or clear recent files. These local paths are separate from session history and never appear in shared summaries.
 
 Example copied summary (no squares, script title or text):
 
 ```text
 WriteWatch · Oct 15, 2026
-Writing · Session complete
+Session complete
 Goal progress: 100%
 Time: 58m 00s · +624 net words
 Goal: 500 net words
@@ -63,7 +65,7 @@ Support follows the **saved format**, not the app name. Select the file that you
 
 **Google Docs, Notion, Pages, Scrivener, Ulysses and cloud/project formats:** export to a supported local format, then refresh that file as you work. Native `.gdoc`, `.pages`, `.scrivx`, legacy `.doc`, and browser storage are not supported. This app cannot observe edits that never reach the selected file. Nothing is fetched from online accounts or links inside documents.
 
-The **Formats & apps** tab gives the same guidance in the app. Files and extracted text have a 16 MB limit; PDFs have a 1,000-page limit. UTF-8 and BOM-marked UTF-16 are supported for plain/markup text; XML follows its encoding declaration and RTF follows its control words. PDFs and exports can give approximate counts; use your native editable format when available. Each session still watches one file.
+**Settings → About WriteWatch → Formats** gives the same guidance in the app. Files and extracted text have a 16 MB limit; PDFs have a 1,000-page limit. UTF-8 and BOM-marked UTF-16 are supported for plain/markup text; XML follows its encoding declaration and RTF follows its control words. PDFs and exports can give approximate counts; use your native editable format when available. Each session still watches one file.
 
 Adapter references: [WordprocessingML](https://learn.microsoft.com/en-us/office/open-xml/word/structure-of-a-wordprocessingml-document), [OpenDocument](https://docs.oasis-open.org/office/v1.3/OpenDocument-v1.3-part3-schema.html), [EPUB](https://www.w3.org/TR/epub-33/), [Fountain](https://fountain.io/syntax/).
 
@@ -98,7 +100,7 @@ CI runs parser, session, privacy, clipboard and UI tests on Windows, Linux, Appl
 
 ## Project status
 
-0.3.0 is a testing release with 12 format families / 20 file extensions. No official relationship with Fade In. This repository currently grants no license to WriteWatch source; Joseph retains rights. Dependency notices are in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+0.7.0 is in development with 12 format families / 20 file extensions. No official relationship with Fade In. This repository currently grants no license to WriteWatch source; Joseph retains rights. Dependency notices are in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 ## Automatic updates (v0.4.0+)
 
@@ -116,7 +118,7 @@ WriteWatch follows [DESIGN.md](DESIGN.md). **Settings** offers System (default),
 
 ### Session workflow
 
-Choose a file, session type and goal (or Skip goal), then start. Setup is replaced by the active session view until you finish. The top-right menu opens Session, History or Settings. Formats and Privacy are in **Settings → About WriteWatch**. Navigating away does not pause or end a session.
+Choose a session type, then open a file to start. Goals are optional and editable during a session. Setup is replaced by the active session view until you finish. The top-right menu opens Session, History or Settings. Formats and Privacy are in **Settings → About WriteWatch**. Navigating away does not pause or end a session.
 
 ### Linux installer (.deb)
 
@@ -131,3 +133,9 @@ WriteWatch appears in the application menu. Remove with `sudo apt remove writewa
 Session setup now uses Writing / Revision and No goal / Set goal toggles. A target appears only for Set goal; writing targets count net words, revision targets count minutes.
 
 Goal controls are now under **Goal settings** at the bottom left of setup. Save applies the selected target; Cancel or Escape restores the previous choice. **Start session** stays on the bottom right.
+
+### History compatibility
+
+The page-goal update upgrades history to schema version 1, retaining all existing sessions and backing up the old database as `history.sqlite3.backup-v0` before migration. Newer unknown schema versions are refused. Older WriteWatch releases do not understand the additional page fields; to downgrade, first preserve your current database and restore the pre-migration backup (sessions created after the backup will not be available in the old app).
+
+A failed final file read now offers a choice to retry later or finish using the last recorded counts. Negative net words are retained as valid session results.

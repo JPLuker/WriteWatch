@@ -8,23 +8,24 @@ The SQLite session table contains ONLY:
 
 - Random session ID
 - Session start timestamp and timezone offset
-- Writing/revision mode and numeric goal (zero records a skipped goal)
+- Writing/revision mode, goal unit and numeric goal (zero records a skipped goal)
+- Self-reported pages and the words-per-page value used for estimates
 - Accumulated manual timer seconds
 - Net word-count change
 - Number of observations where the word count changed
 - Running, paused, completed or interrupted state
 
-No filename, path, script title, character name, word list, content hash or text is stored in this database. A selected file path, file size/modification/inode signature and last observed word count exist in memory until the application closes. Script content exists transiently while parsing; this is not a promise of protection from operating-system swap, memory inspection, or crash dumps.
+No filename, path, script title, character name, word list, content hash or text is stored in this database. Recent file paths (up to ten) are saved separately in `recents.ini` beside the history database. Settings → Files can disable or clear this list; paths never enter shared summaries. File size/modification/inode signatures and the last observed word count remain in memory. Script content exists transiently while parsing; this is not a promise of protection from operating-system swap, memory inspection, or crash dumps.
 
 History is stored in Qt's AppLocalDataLocation (normally `%LOCALAPPDATA%/WriteWatch/WriteWatch` on Windows and `~/.local/share/WriteWatch/WriteWatch` on Linux, and `~/Library/Application Support/WriteWatch/WriteWatch` on macOS). An optional `WRITEWATCH_DATA_DIR` environment variable overrides that storage folder (useful for portable installs). History → Delete history clears completed/interrupted rows and vacuums the database. This is not forensic secure erasure and cannot delete OS backups. Removing the app does not automatically erase history.
 
 ## Sharing
 
-The Done dialog shows the exact text copied. It contains only session type, date, duration, net words and goal progress. The optional PNG is rendered from those same numeric/session fields. No script text or image of the editor is included. The clipboard or a saved PNG can be retained by your OS, backup tools or clipboard-sync service. Posting to your group is your action.
+The Done dialog shows the exact text copied. It contains only session type when relevant, date, duration, net words, labeled page measurements and goal progress. The optional PNG is rendered from those same numeric/session fields. No script text or image of the editor is included. The clipboard or a saved PNG can be retained by your OS, backup tools or clipboard-sync service. Posting to your group is your action.
 
 ## Failure behavior
 
-Unreadable/partially saved files preserve the last good count and show a generic error without XML content or paths. A failed final read leaves the session open for retry. Numeric checkpoints allow interrupted-session recovery after a crash. A single-instance lock prevents simultaneous writers from duplicating/recovering one another's active sessions. No automatic update checks are included.
+Unreadable/partially saved files preserve the last good count and show a generic error without XML content or paths. A failed final read offers retry or finishing with the last recorded counts; finishing requires explicit confirmation. Numeric checkpoints allow interrupted-session recovery after a crash. A single-instance lock prevents simultaneous writers from duplicating/recovering one another's active sessions.
 
 All format adapters operate locally. Links in Markdown, HTML, EPUB, DOCX or other documents are never followed over the network. Archives are read in memory without extracting their paths onto disk. XML entities are disabled. Encrypted PDFs and external EPUB chapters are rejected. New formats do not add any fields to stored history or shared summaries.
 

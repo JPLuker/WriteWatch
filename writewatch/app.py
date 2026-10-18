@@ -11,7 +11,7 @@ from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QPushButton, QFileDialog, QComboBox, QSpinBox, QFrame, QProgressBar,
     QTabWidget, QTableWidget, QTableWidgetItem, QHeaderView, QMessageBox,
-    QDialog, QPlainTextEdit, QAbstractItemView, QScrollArea, QCheckBox, QToolButton, QMenu, QToolBox,
+    QDialog, QPlainTextEdit, QAbstractItemView, QScrollArea, QCheckBox, QToolButton, QMenu, QToolBox, QDoubleSpinBox,
 )
 from . import __version__
 from .core import ScriptError, Session, Store, Tracker
@@ -75,11 +75,11 @@ def card(session: Session) -> QPixmap:
     p.setFont(QFont(QApplication.font().family(), 39, QFont.Weight.DemiBold))
     minutes, seconds = divmod(int(session.seconds), 60)
     p.drawText(64, 465, f"{minutes}m {seconds:02d}s")
-    p.drawText(640, 465, f"{session.net:+,}")
+    p.drawText(640, 465, f"{session.page_count:,.1f}" if session.unit in ("pages", "estimated_pages") else f"{session.net:+,}")
     p.setFont(QFont(QApplication.font().family(), 17))
     p.setPen(QColor(DARK["secondary"]))
     p.drawText(64, 510, "Session time")
-    p.drawText(640, 510, "Net words")
+    p.drawText(640, 510, {"pages": "Pages (self-reported)", "estimated_pages": "Estimated pages"}.get(session.unit, "Net words"))
     goal_text = f"{session.goal_result}  /  {session.goal_label}" if session.goal else "No goal set"
     p.drawText(64, 610, goal_text)
     p.setFont(QFont(QApplication.font().family(), 13))
@@ -121,7 +121,7 @@ class ShareDialog(QDialog):
         self.text.setMinimumHeight(180)
         layout.addWidget(self.text)
         row = QHBoxLayout()
-        self.copy = button("Copy for writers group", self.copy_summary, True)
+        self.copy = button("Copy", self.copy_summary, True)
         row.addWidget(self.copy)
         row.addWidget(button("Save image…", lambda: self.save_image(session)))
         row.addWidget(button("Close", self.accept))
@@ -144,6 +144,8 @@ class Window(QMainWindow):
     def __init__(self, store, update_folder=None):
         super().__init__()
         self.store = store
+        self.recent_settings = QSettings(str(store.path.parent / "recents.ini"), QSettings.Format.IniFormat)
+        self.recent_settings.setValue("format_version", 1)
         self.path = None
         self.tracker = None
         self.setWindowTitle("WriteWatch")
@@ -226,6 +228,12 @@ class Window(QMainWindow):
             from .update_ui import UpdatesPanel
             self.updates = UpdatesPanel(self, folder)
             layout.addWidget(self.updates)
+        layout.addWidget(label("Files", "section"))
+        self.remember_files = QCheckBox("Remember recent files")
+        self.remember_files.setChecked(self.recent_settings.value("remember", True, type=bool))
+        self.remember_files.toggled.connect(self.set_remember_files)
+        layout.addWidget(self.remember_files)
+        layout.addWidget(button("Clear recent files", self.clear_recents))
         layout.addStretch()
         layout.addWidget(button("About WriteWatch", self.show_about))
         self.add_scroll_tab(page, "Settings")
@@ -268,7 +276,7 @@ class Window(QMainWindow):
         layout = QVBoxLayout(page)
         layout.setContentsMargins(0, 20, 0, 0)
         layout.setSpacing(16)
-        # FOCAL: Start in setup; timer during an active session.
+        # FOCAL: Open file before a session; timer during an active session.
         self.setup_panel = QFrame()
         self.setup_panel.setObjectName("panel")
         setup = QVBoxLayout(self.setup_panel)
@@ -277,17 +285,16 @@ class Window(QMainWindow):
         setup.addWidget(label("New session", "title"))
         setup.addWidget(label("Writing file", "eyebrow"))
         row = QHBoxLayout()
-        self.choose = button("Choose file…", self.pick)
+        self.choose = button("Open file…", self.pick, True)
         row.addWidget(self.choose)
         self.file_status = label("No document selected", "muted")
         self.file_status.setWordWrap(True)
         row.addWidget(self.file_status, 1)
         setup.addLayout(row)
-        setup.addWidget(label("Session type", "eyebrow"))
         self.mode = SegmentedChoice(["Writing", "Revision"])
         self.mode.setAccessibleName("Session type")
         self.mode.currentTextChanged.connect(self.mode_changed)
-        setup.addWidget(self.mode)
+        layout.addWidget(self.mode)
         self.goal_dialog = QDialog(self)
         self.goal_dialog.setWindowTitle("Goal settings")
         self.goal_dialog.resize(440, 240)
@@ -304,6 +311,21 @@ class Window(QMainWindow):
         self.skip_goal = GoalChoice()
         self.skip_goal.toggled.connect(lambda _: self.update_view())
         goal_settings.addWidget(self.skip_goal)
+        self.goal_unit = SegmentedChoice(["Words", "Pages", "Minutes"])
+        self.goal_unit.setAccessibleName("Goal unit")
+        goal_settings.addWidget(self.goal_unit)
+        self.page_method = SegmentedChoice(["Enter pages", "Estimate"])
+        self.page_method.setAccessibleName("Page measurement")
+        goal_settings.addWidget(self.page_method)
+        self.page_rate = QSpinBox()
+        self.page_rate.setRange(1, 2000)
+        self.page_rate.setValue(250)
+        self.page_rate.setSuffix(" words per page")
+        self.page_rate.setAccessibleName("Words per estimated page")
+        goal_settings.addWidget(self.page_rate)
+        self.page_hint = label("Estimates use word count, not editor pagination.", "muted")
+        self.page_hint.setWordWrap(True)
+        goal_settings.addWidget(self.page_hint)
         self.goal_row = QWidget()
         goal_layout = QHBoxLayout(self.goal_row)
         goal_layout.setContentsMargins(0, 0, 0, 0)
@@ -319,10 +341,10 @@ class Window(QMainWindow):
         setup.addSpacing(8)
         actions = QHBoxLayout()
         self.goal_settings_button = button("Goal settings", self.edit_goal)
-        actions.addWidget(self.goal_settings_button)
+        # Goal settings has one home, below the session panel.
         actions.addStretch()
         self.start = button("Start session", self.begin, True)
-        actions.addWidget(self.start)
+        self.start.hide()  # Kept as an internal entry point; selecting a file starts tracking.
         setup.addLayout(actions)
         layout.addWidget(self.setup_panel)
         panel = QFrame()
@@ -338,16 +360,29 @@ class Window(QMainWindow):
         self.words = label("+0", "number")
         self.percent = label("0%", "number")
         self.goal_caption = label("Goal", "muted")
+        self.words_caption = label("Net words", "muted")
         for number, title in [(self.words, "Net words"), (self.percent, "Goal")]:
             col = QVBoxLayout()
             col.addWidget(number)
-            col.addWidget(self.goal_caption if number is self.percent else label(title, "muted"))
+            col.addWidget(self.goal_caption if number is self.percent else self.words_caption)
             row.addLayout(col)
         body.addLayout(row)
         body.addSpacing(16)
         self.progress = QProgressBar()
         self.progress.setTextVisible(False)
         body.addWidget(self.progress)
+        self.pages_row = QWidget()
+        pages_layout = QHBoxLayout(self.pages_row)
+        pages_layout.setContentsMargins(0, 0, 0, 0)
+        pages_layout.addWidget(label("Pages completed"))
+        self.pages_done = QDoubleSpinBox()
+        self.pages_done.setRange(0, 100000)
+        self.pages_done.setDecimals(1)
+        self.pages_done.setSingleStep(0.5)
+        self.pages_done.setAccessibleName("Pages completed, self-reported")
+        self.pages_done.valueChanged.connect(self.record_pages)
+        pages_layout.addWidget(self.pages_done)
+        body.addWidget(self.pages_row)
         layout.addWidget(panel)
         self.message = label("Save in your editor to update progress.", "muted")
         self.message.setWordWrap(True)
@@ -355,17 +390,52 @@ class Window(QMainWindow):
         row = QHBoxLayout()
         self.pause_button = button("Pause", self.pause_resume)
         self.done = button("Finish session", self.finish)
+        row.addWidget(self.goal_settings_button)
+        row.addStretch()
         row.addWidget(self.pause_button)
         row.addWidget(self.done)
         layout.addLayout(row)
         layout.addStretch()
+        self.goal_unit.currentTextChanged.connect(self.goal_unit_changed)
+        self.page_method.currentTextChanged.connect(lambda _: self.update_view())
         self.add_scroll_tab(page, "Session")
 
+    def selected_goal_unit(self):
+        if self.goal_unit.currentText() == "Pages":
+            return "estimated_pages" if self.page_method.currentText() == "Estimate" else "pages"
+        return self.goal_unit.currentText().lower()
+
+    def goal_unit_changed(self, unit):
+        self.goal.setMaximum(1440 if unit == "Minutes" else 100000)
+        self.goal.setSuffix({"Words": " net words", "Pages": " pages", "Minutes": " minutes"}[unit])
+        self.goal.setValue({"Words": 500, "Pages": 5, "Minutes": 30}[unit])
+        self.update_view()
+
+    def apply_goal(self):
+        if self.tracker:
+            session = self.tracker.session
+            session.goal = 0 if self.skip_goal.isChecked() else self.goal.value()
+            session.goal_unit = self.selected_goal_unit()
+            session.words_per_page = self.page_rate.value()
+            self.persist()
+
+    def record_pages(self, value):
+        if self.tracker:
+            self.tracker.session.pages = value
+            self.persist()
+            self.update_view()
+
     def edit_goal(self):
-        previous = (self.skip_goal.isChecked(), self.goal.value())
+        previous = (self.skip_goal.isChecked(), self.goal.value(), self.goal_unit.currentText(),
+                    self.page_method.currentText(), self.page_rate.value())
         if self.goal_dialog.exec() != QDialog.DialogCode.Accepted:
             self.skip_goal.setChecked(previous[0])
+            self.goal_unit.setCurrentText(previous[2])
             self.goal.setValue(previous[1])
+            self.page_method.setCurrentText(previous[3])
+            self.page_rate.setValue(previous[4])
+        else:
+            self.apply_goal()
         self.update_view()
 
     def build_history(self):
@@ -459,9 +529,9 @@ class Window(QMainWindow):
         for title, text in [
             ("Private by design", "No accounts, analytics, uploads, keyboard recording or automatic posts. The selected document is opened read-only on this computer."),
             ("Optional updates", "Automatic updates contact GitHub for release metadata and app downloads. GitHub receives normal connection information such as your IP address. No document or session data is sent. Turn automatic checks off in Updates."),
-            ("Numbers, not drafts", "History stores session date, type, goal, duration, net word change, count-changing observations and completion status. It does not store document text, titles, filenames or paths."),
+            ("Numbers, not drafts", "History stores session statistics, goal units and page measurements, never document text or file paths. Recent file paths are stored separately on this device; turn them off or clear them in Settings."),
             ("An honest measure", "Net words compare saved word counts. Equal-length rewrites do not increase the number. Counting rules vary by format; see Formats & apps. Counts can differ from your editor. Cloud-only documents need a refreshed local export."),
-            ("You control the clock", "Start / Pause / Done controls session time. It does not detect typing or focus. Edits saved while paused are excluded when you resume. A long system suspension pauses the timer. Save before pausing or finishing."),
+            ("You control the clock", "Opening a file starts session time; Pause and Finish control it. It does not detect typing or focus. Edits saved while paused are excluded when you resume. A long system suspension pauses the timer. Save before pausing or finishing."),
             ("Share on your terms", "Copy sends only the displayed summary to your system clipboard. Save image exports the metrics shown on the card. Your clipboard manager or clipboard sync may retain copied summaries."),
         ]:
             self.help_section(layout, title, text)
@@ -469,17 +539,60 @@ class Window(QMainWindow):
         self.add_scroll_tab(page, "Privacy")
 
     def mode_changed(self, mode):
-        self.goal.setMaximum(1440 if mode == "Revision" else 100000)
-        self.goal.setSuffix(" minutes" if mode == "Revision" else " net words")
-        self.goal.setValue(30 if mode == "Revision" else 500)
+        if self.tracker:
+            self.tracker.session.mode = mode
+            self.persist()
+        else:
+            self.goal_unit.setCurrentText("Minutes" if mode == "Revision" else "Words")
         self.update_view()
 
-    def pick(self):
-        path, _ = QFileDialog.getOpenFileName(self, "Choose a saved writing file", "", file_filter())
-        if path:
-            self.path = Path(path)
+    def clear_recents(self):
+        self.recent_settings.remove("files")
+        self.recent_settings.sync()
+
+    def set_remember_files(self, enabled):
+        self.recent_settings.setValue("remember", enabled)
+        if not enabled:
+            self.clear_recents()
+
+    def recent_files(self):
+        files = self.recent_settings.value("files", [])
+        if isinstance(files, str):
+            files = [files]
+        return [str(p) for p in files][:10] if isinstance(files, list) else []
+
+    def open_path(self, path):
+        if self.tracker:
+            return
+        self.path = Path(path)
+        self.begin()
+        if self.tracker:
             self.file_status.setText(format_name(self.path) + " selected")
-            self.update_view()
+            if self.recent_settings.value("remember", True, type=bool):
+                selected = str(self.path.absolute())
+                self.recent_settings.setValue("files", [selected] + [p for p in self.recent_files() if p != selected][:9])
+                self.recent_settings.sync()
+
+    def browse(self):
+        path, _ = QFileDialog.getOpenFileName(self, "Open writing file", "", file_filter())
+        if path:
+            self.open_path(path)
+
+    def pick(self):
+        files = self.recent_files()
+        if not files:
+            self.browse()
+            return
+        menu = QMenu(self)
+        for path in files:
+            action = menu.addAction(Path(path).name.replace("&", "&&"))
+            action.setToolTip(path)
+            action.triggered.connect(lambda checked=False, p=path: self.open_path(p))
+        menu.addSeparator()
+        menu.addAction("Browse…", self.browse)
+        menu.addAction("Clear recent files", self.clear_recents)
+        menu.exec(self.choose.mapToGlobal(self.choose.rect().bottomLeft()))
+        menu.deleteLater()
 
     def persist(self):
         if not self.tracker:
@@ -493,10 +606,15 @@ class Window(QMainWindow):
             return False
 
     def begin(self):
-        if not self.path:
+        if not self.path or self.tracker:
             return
         try:
             self.tracker = Tracker(self.path, self.mode.currentText(), 0 if self.skip_goal.isChecked() else self.goal.value())
+            self.tracker.session.goal_unit = self.selected_goal_unit()
+            self.tracker.session.words_per_page = self.page_rate.value()
+            self.pages_done.blockSignals(True)
+            self.pages_done.setValue(0)
+            self.pages_done.blockSignals(False)
             if self.persist():
                 self.message.setText("Save in your editor to update progress.")
         except ScriptError as error:
@@ -539,9 +657,19 @@ class Window(QMainWindow):
             if not self.persist():
                 self.update_view()
                 return
-        except ScriptError as error:
-            QMessageBox.warning(self, "Save and retry", str(error) + " Your session remains open.")
-            return
+        except ScriptError:
+            choice = QMessageBox.question(
+                self, "Final save unavailable",
+                "Could not read the final save. Finish using the last recorded counts?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No)
+            if choice != QMessageBox.StandardButton.Yes:
+                return
+            session = self.tracker.session
+            session.status = "done"
+            if not self.persist():
+                self.update_view()
+                return
         self.tracker = None
         self.refresh_history()
         self.update_view()
@@ -553,14 +681,20 @@ class Window(QMainWindow):
         self.setup_panel.setVisible(not active)
         self.active_panel.setVisible(active)
         self.goal_row.setVisible(not self.skip_goal.isChecked())
-        target = f"{self.goal.value():,} {'minutes' if self.mode.currentText() == 'Revision' else 'words'}"
-        self.goal_settings_button.setText("Goal settings" if self.skip_goal.isChecked() else f"Goal settings · {target}")
+        self.goal_unit.setVisible(not self.skip_goal.isChecked())
+        page_goal = not self.skip_goal.isChecked() and self.goal_unit.currentText() == "Pages"
+        estimate = page_goal and self.page_method.currentText() == "Estimate"
+        self.page_method.setVisible(page_goal)
+        self.page_rate.setVisible(estimate)
+        self.page_hint.setVisible(estimate)
+        target = f"{self.goal.value():,} {self.goal_unit.currentText().lower()}"
+        self.goal_settings_button.setText("Goal settings" if active or self.skip_goal.isChecked() else f"Goal settings · {target}")
         self.goal_settings_button.setToolTip("No goal" if self.skip_goal.isChecked() else target)
-        for widget in (self.choose, self.mode, self.skip_goal):
+        for widget in (self.choose,):
             widget.setEnabled(not active)
-        self.goal.setEnabled(not active and not self.skip_goal.isChecked())
+        self.goal.setEnabled(not self.skip_goal.isChecked())
         self.start.setEnabled(not active and self.path is not None)
-        self.start.setVisible(not active)
+        self.start.setVisible(False)
         self.done.setVisible(active)
         self.done.setObjectName("primary")
         self.done.style().unpolish(self.done)
@@ -569,13 +703,16 @@ class Window(QMainWindow):
         self.pause_button.setEnabled(active)
         self.done.setEnabled(active)
         session = self.tracker.session if active else None
+        self.pages_row.setVisible(active and session.unit == "pages")
         paused = active and session.status == "paused"
         self.pause_button.setText("Resume" if paused else "Pause")
-        self.state_label.setText("Paused" if paused else session.mode if active else "Ready")
+        self.state_label.setText("Paused" if paused else "Running" if active else "Ready")
         seconds = int(session.seconds) if active else 0
         minutes, seconds = divmod(seconds, 60)
         self.time_label.setText(f"{minutes:02d}:{seconds:02d}")
-        self.words.setText(f"{session.net if active else 0:+,}")
+        estimated = active and session.unit == "estimated_pages"
+        self.words.setText(f"{session.page_count:,.1f}" if estimated else f"{session.net if active else 0:+,}")
+        self.words_caption.setText("Estimated pages" if estimated else "Net words")
         percent = round(session.progress * 100) if active else 0
         has_goal = bool(session.goal) if active else not self.skip_goal.isChecked()
         self.percent.setText(f"{percent}%" if has_goal else "—")
@@ -674,6 +811,9 @@ def main():
         return 0
     try:
         store = Store(folder / "history.sqlite3")
+    except ValueError as error:
+        QMessageBox.critical(None, "History unavailable", str(error))
+        return 1
     except Exception:
         QMessageBox.critical(None, "History unavailable", "WriteWatch could not open local history. Check disk space and folder permissions.")
         return 1
