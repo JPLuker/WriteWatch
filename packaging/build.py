@@ -6,6 +6,7 @@ import subprocess
 import sys
 import platform
 import plistlib
+import time
 
 ROOT = Path(__file__).resolve().parents[1]
 os.chdir(ROOT)
@@ -77,7 +78,18 @@ elif sys.platform == 'darwin':
     subprocess.run(['ditto', str(bundle), str(staging / 'WriteWatch.app')], check=True)
     (staging / 'Applications').symlink_to('/Applications')
     shutil.copy('packaging/MAC_INSTALL.md', staging / 'READ ME FIRST.txt')
-    subprocess.run(['hdiutil', 'create', '-volname', 'WriteWatch', '-srcfolder', str(staging),
-                    '-ov', '-format', 'UDZO', str(ROOT / 'dist' / (base + '.dmg'))], check=True)
+    dmg_command = ['hdiutil', 'create', '-volname', 'WriteWatch', '-srcfolder', str(staging),
+                   '-ov', '-format', 'UDZO', str(ROOT / 'dist' / (base + '.dmg'))]
+    # Hosted macOS runners can briefly report EBUSY while attaching a new image.
+    # Retry only that error; never conceal signing or other packaging failures.
+    for attempt in range(3):
+        result = subprocess.run(dmg_command, capture_output=True, text=True)
+        print(result.stdout, end='')
+        print(result.stderr, end='', file=sys.stderr)
+        if result.returncode == 0:
+            break
+        if 'Resource busy' not in result.stderr or attempt == 2:
+            result.check_returncode()
+        time.sleep(3 * (attempt + 1))
 else:
     shutil.make_archive(f'dist/WriteWatch-{__version__}-Linux-x86_64' , 'gztar', 'dist', 'WriteWatch')

@@ -9,6 +9,9 @@
 - Open the data folder, clear update downloads/logs, and delete all app-owned data with confirmation before quitting.
 - Copy diagnostic information from About without document names or contents.
 
+### Fixed
+- Retry transient macOS disk-image resource-busy failures during packaging, with a bounded retry count.
+
 ## [0.8.1] — 2026-10-18
 ### Fixed
 - Enabled update checks and release-download notices for DEB installations. Package installation remains under the system package manager.
