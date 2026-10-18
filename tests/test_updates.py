@@ -64,6 +64,7 @@ class UpdateTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             TrustedRedirect().redirect_request(None, None, 302, '', {}, 'http://github.com/payload')
 
+    @unittest.skipIf(sys.platform == 'win32', 'Linux absolute paths')
     def test_deb_detected_without_enabling_other_linux_copies(self):
         with patch.object(sys, 'frozen', True, create=True), patch.object(sys, 'platform', 'linux'), patch.dict(os.environ, {'APPIMAGE': ''}), patch('writewatch.updates.platform.machine', return_value='x86_64'):
             with patch.object(sys, 'executable', '/opt/writewatch/WriteWatch'):
