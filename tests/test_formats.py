@@ -4,7 +4,7 @@ import unittest
 import zipfile
 from pathlib import Path
 
-from writewatch.formats import ScriptError, word_count, file_filter
+from writewatch.formats import ScriptError, word_count, file_filter, extract_text
 from writewatch.core import Tracker, Store
 
 
@@ -123,7 +123,7 @@ class FormatTests(unittest.TestCase):
         from unittest.mock import patch
         path = self.file('.txt', 'Hello world')
         tracker = Tracker(path, 'Writing', 100)
-        with patch('writewatch.core.word_count', wraps=word_count) as parser:
+        with patch('writewatch.core.extract_text', wraps=extract_text) as parser:
             tracker.observe()
             tracker.observe()
             parser.assert_not_called()

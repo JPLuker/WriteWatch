@@ -141,7 +141,7 @@ class CoreTests(unittest.TestCase):
         self.assertEqual(history[0].status, 'interrupted')
         self.assertEqual(history[0].net, 12)
         columns = [row[1] for row in store.db.execute('PRAGMA table_info(sessions)')]
-        self.assertEqual(columns, ['id', 'started', 'mode', 'goal', 'seconds', 'net', 'saves', 'status', 'goal_unit', 'pages', 'words_per_page'])
+        self.assertEqual(columns, ['id', 'started', 'mode', 'goal', 'seconds', 'net', 'saves', 'status', 'goal_unit', 'pages', 'words_per_page', 'added', 'removed', 'revision_metrics'])
         self.assertNotIn(b'secret-title', db_path.read_bytes())
         self.assertNotIn(b'one two three', db_path.read_bytes())
         store.clear()

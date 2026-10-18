@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+## [0.8.0] — 2026-10-18
+### Breaking
+- Upgraded history to store revision totals, with a backup for returning to an older version.
+### Added
+- Added cumulative words added and removed to revision sessions, reviews and shared summaries.
+### Changed
+- Kept older session totals unavailable instead of displaying invented revision measurements.
+
 ## [0.7.0] — 2026-10-18
 ### Breaking
 - Upgraded history for page goals; kept a pre-upgrade backup. Older app versions require restoring that backup to read history.

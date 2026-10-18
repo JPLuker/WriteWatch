@@ -81,6 +81,8 @@ def card(session: Session) -> QPixmap:
     p.drawText(64, 510, "Session time")
     p.drawText(640, 510, {"pages": "Pages (self-reported)", "estimated_pages": "Estimated pages"}.get(session.unit, "Net words"))
     goal_text = f"{session.goal_result}  /  {session.goal_label}" if session.goal else "No goal set"
+    if session.mode == "Revision" and session.revision_metrics:
+        p.drawText(64, 560, f"{session.added:,} words added  /  {session.removed:,} words removed")
     p.drawText(64, 610, goal_text)
     p.setFont(QFont(QApplication.font().family(), 13))
     p.end()
@@ -383,6 +385,10 @@ class Window(QMainWindow):
         self.pages_done.valueChanged.connect(self.record_pages)
         pages_layout.addWidget(self.pages_done)
         body.addWidget(self.pages_row)
+        self.revision_counts = label("", "muted")
+        self.revision_counts.setWordWrap(True)
+        self.revision_counts.setToolTip("Cumulative word additions and removals between observed saves. Moving words and punctuation-only edits are not counted.")
+        body.addWidget(self.revision_counts)
         layout.addWidget(panel)
         self.message = label("Save in your editor to update progress.", "muted")
         self.message.setWordWrap(True)
@@ -530,6 +536,7 @@ class Window(QMainWindow):
             ("Private by design", "No accounts, analytics, uploads, keyboard recording or automatic posts. The selected document is opened read-only on this computer."),
             ("Optional updates", "Automatic updates contact GitHub for release metadata and app downloads. GitHub receives normal connection information such as your IP address. No document or session data is sent. Turn automatic checks off in Updates."),
             ("Numbers, not drafts", "History stores session statistics, goal units and page measurements, never document text or file paths. Recent file paths are stored separately on this device; turn them off or clear them in Settings."),
+            ("Revision metrics", "Added and removed words compare word occurrences between observed saves. Equal-length replacements count; word moves and punctuation-only edits do not. Repeated edits and saved undos count again. Paused edits are excluded. These totals describe changes, not editing quality."),
             ("An honest measure", "Net words compare saved word counts. Equal-length rewrites do not increase the number. Counting rules vary by format; see Formats & apps. Counts can differ from your editor. Cloud-only documents need a refreshed local export."),
             ("You control the clock", "Opening a file starts session time; Pause and Finish control it. It does not detect typing or focus. Edits saved while paused are excluded when you resume. A long system suspension pauses the timer. Save before pausing or finishing."),
             ("Share on your terms", "Copy sends only the displayed summary to your system clipboard. Save image exports the metrics shown on the card. Your clipboard manager or clipboard sync may retain copied summaries."),
@@ -670,6 +677,7 @@ class Window(QMainWindow):
             if not self.persist():
                 self.update_view()
                 return
+        self.tracker.discard_snapshot()
         self.tracker = None
         self.refresh_history()
         self.update_view()
@@ -704,6 +712,9 @@ class Window(QMainWindow):
         self.done.setEnabled(active)
         session = self.tracker.session if active else None
         self.pages_row.setVisible(active and session.unit == "pages")
+        self.revision_counts.setVisible(active and session.mode == "Revision")
+        if active:
+            self.revision_counts.setText(f"{session.added:,} words added · {session.removed:,} words removed")
         paused = active and session.status == "paused"
         self.pause_button.setText("Resume" if paused else "Pause")
         self.state_label.setText("Paused" if paused else "Running" if active else "Ready")

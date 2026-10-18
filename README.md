@@ -100,7 +100,7 @@ CI runs parser, session, privacy, clipboard and UI tests on Windows, Linux, Appl
 
 ## Project status
 
-0.7.0 is in development with 12 format families / 20 file extensions. No official relationship with Fade In. This repository currently grants no license to WriteWatch source; Joseph retains rights. Dependency notices are in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+0.8.0 is in development with 12 format families / 20 file extensions. No official relationship with Fade In. This repository currently grants no license to WriteWatch source; Joseph retains rights. Dependency notices are in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 ## Automatic updates (v0.4.0+)
 
@@ -139,3 +139,11 @@ Goal controls are now under **Goal settings** at the bottom left of setup. Save 
 The page-goal update upgrades history to schema version 1, retaining all existing sessions and backing up the old database as `history.sqlite3.backup-v0` before migration. Newer unknown schema versions are refused. Older WriteWatch releases do not understand the additional page fields; to downgrade, first preserve your current database and restore the pre-migration backup (sessions created after the backup will not be available in the old app).
 
 A failed final file read now offers a choice to retry later or finish using the last recorded counts. Negative net words are retained as valid session results.
+
+### Revision metrics (0.8.0)
+
+Revision sessions show **words added** and **words removed** in the active view, history summaries, copied text and share images. Totals accumulate differences in word occurrences between observed saves. Equal-length word substitutions can therefore register activity even when net words stays at zero. Case changes count; punctuation-only changes and moving/reordering existing words do not. Changes undone before the next observation cannot be measured; saved undos and repeated rewrites count again. These are change totals, not typing counts or a quality score. Paused edits remain excluded.
+
+The parser extracts text locally, then builds session-keyed word fingerprints in memory. No text or fingerprints are saved in history or sent anywhere. Only numeric totals persist. Switching session mode retains totals for the whole session. Older sessions do not acquire invented revision totals.
+
+History schema version 2 backs up the previous database before adding these numeric fields. Keep the backup if you need to return to an older WriteWatch version.

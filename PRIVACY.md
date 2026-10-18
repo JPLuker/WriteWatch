@@ -11,17 +11,17 @@ The SQLite session table contains ONLY:
 - Writing/revision mode, goal unit and numeric goal (zero records a skipped goal)
 - Self-reported pages and the words-per-page value used for estimates
 - Accumulated manual timer seconds
-- Net word-count change
-- Number of observations where the word count changed
+- Net word-count change, cumulative word additions/removals, and whether those revision metrics were collected
+- Number of observations where word occurrences changed
 - Running, paused, completed or interrupted state
 
-No filename, path, script title, character name, word list, content hash or text is stored in this database. Recent file paths (up to ten) are saved separately in `recents.ini` beside the history database. Settings → Files can disable or clear this list; paths never enter shared summaries. File size/modification/inode signatures and the last observed word count remain in memory. Script content exists transiently while parsing; this is not a promise of protection from operating-system swap, memory inspection, or crash dumps.
+No filename, path, script title, character name, word list, content fingerprint or text is stored in this database. Recent file paths (up to ten) are saved separately in `recents.ini` beside the history database. Settings → Files can disable or clear this list; paths never enter shared summaries. File size/modification/inode signatures, session-keyed word fingerprints and occurrence counts remain in memory. The random key changes with each session; fingerprints are never persisted or transmitted, and are discarded after successfully finishing. Script content exists transiently while parsing; this is not a promise of protection from operating-system swap, memory inspection, or crash dumps.
 
 History is stored in Qt's AppLocalDataLocation (normally `%LOCALAPPDATA%/WriteWatch/WriteWatch` on Windows and `~/.local/share/WriteWatch/WriteWatch` on Linux, and `~/Library/Application Support/WriteWatch/WriteWatch` on macOS). An optional `WRITEWATCH_DATA_DIR` environment variable overrides that storage folder (useful for portable installs). History → Delete history clears completed/interrupted rows and vacuums the database. This is not forensic secure erasure and cannot delete OS backups. Removing the app does not automatically erase history.
 
 ## Sharing
 
-The Done dialog shows the exact text copied. It contains only session type when relevant, date, duration, net words, labeled page measurements and goal progress. The optional PNG is rendered from those same numeric/session fields. No script text or image of the editor is included. The clipboard or a saved PNG can be retained by your OS, backup tools or clipboard-sync service. Posting to your group is your action.
+The Done dialog shows the exact text copied. It contains only session type when relevant, date, duration, net words, revision additions/removals when collected, labeled page measurements and goal progress. The optional PNG is rendered from those same numeric/session fields. No script text or image of the editor is included. The clipboard or a saved PNG can be retained by your OS, backup tools or clipboard-sync service. Posting to your group is your action.
 
 ## Failure behavior
 

@@ -1,4 +1,4 @@
-"""Content is read transiently. Only aggregate numbers leave the parser."""
+"""Content is read transiently. Only aggregate numbers are persisted."""
 from __future__ import annotations
 
 from dataclasses import dataclass, asdict
@@ -6,10 +6,13 @@ from contextlib import closing
 from datetime import datetime
 from pathlib import Path
 import sqlite3
+import hashlib
+import secrets
+from collections import Counter
 import time
 import uuid
 
-from .formats import ScriptError, word_count
+from .formats import ScriptError, word_count, extract_text, WORDS
 
 
 @dataclass
@@ -26,6 +29,9 @@ class Session:
     goal_unit: str = ""
     pages: float = 0
     words_per_page: int = 250
+    added: int = 0
+    removed: int = 0
+    revision_metrics: bool = False
 
     @property
     def unit(self):
@@ -70,6 +76,8 @@ class Session:
         heading = "Session complete" if self.status == "done" else "Interrupted session"
         lines = [f"WriteWatch · {date}", f"Revision · {heading}" if self.mode == "Revision" else heading,
                  f"Time: {minutes}m {seconds:02d}s · {self.net:+,} net words"]
+        if self.mode == "Revision" and self.revision_metrics:
+            lines.append(f"Words added: {self.added:,} · Words removed: {self.removed:,}")
         if self.unit in ("pages", "estimated_pages"):
             qualifier = "Estimated pages" if self.unit == "estimated_pages" else "Pages (self-reported)"
             lines.append(f"{qualifier}: {self.page_count:,.1f}")
@@ -79,12 +87,14 @@ class Session:
 
 
 class Tracker:
-    """Manual timer; paused edits are excluded on resume. No text snapshots."""
+    """Manual timer; paused edits excluded. Only keyed word fingerprints retained in memory."""
     def __init__(self, path: Path, mode: str, goal: int, clock=time.monotonic):
         self.path = path
         self.clock = clock
+        self._key = secrets.token_bytes(32)
         self.previous, self.signature = self.read_snapshot()
         self.session = Session.new(mode, goal)
+        self.session.revision_metrics = True
         self.last_tick = clock()
 
     def tick(self):
@@ -106,7 +116,10 @@ class Tracker:
 
     def read_snapshot(self):
         before = self.file_signature()
-        count = word_count(self.path)
+        text = extract_text(self.path)
+        # Session-specific fingerprints never enter SQLite, logs or summaries.
+        count = Counter(hashlib.blake2b(match.group().encode("utf-8"), key=self._key,
+                                       digest_size=16).digest() for match in WORDS.finditer(text))
         after = self.file_signature()
         if before != after:
             raise ScriptError("The document is still being saved. Retry when your editor finishes saving.")
@@ -118,9 +131,12 @@ class Tracker:
         if not force and self.file_signature() == self.signature:
             return
         count, signature = self.read_snapshot()
-        delta = count - self.previous
-        if delta:
-            self.session.net += delta
+        added = sum((count - self.previous).values())
+        removed = sum((self.previous - count).values())
+        if added or removed:
+            self.session.added += added
+            self.session.removed += removed
+            self.session.net += added - removed
             self.session.saves += 1
         self.previous = count
         self.signature = signature
@@ -142,6 +158,11 @@ class Tracker:
         return self.session
 
 
+    def discard_snapshot(self):
+        self.previous.clear()
+        self._key = b""
+
+
 class Store:
     """Explicit schema is also the persistence privacy allowlist."""
     def __init__(self, path: Path):
@@ -149,12 +170,12 @@ class Store:
         self.path = path
         self.db = sqlite3.connect(path)
         version = self.db.execute("PRAGMA user_version").fetchone()[0]
-        if version > 1:
+        if version > 2:
             self.db.close()
             raise ValueError("This data was saved by a newer version. Update WriteWatch to open it.")
         exists = self.db.execute("SELECT 1 FROM sqlite_master WHERE name='sessions'").fetchone()
-        if version == 0 and exists:
-            with closing(sqlite3.connect(str(path) + ".backup-v0")) as backup:
+        if version < 2 and exists:
+            with closing(sqlite3.connect(str(path) + f".backup-v{version}")) as backup:
                 self.db.backup(backup)
 
         self.db.row_factory = sqlite3.Row
@@ -169,13 +190,20 @@ class Store:
                 self.db.execute("ALTER TABLE sessions ADD COLUMN pages REAL NOT NULL DEFAULT 0")
                 self.db.execute("ALTER TABLE sessions ADD COLUMN words_per_page INTEGER NOT NULL DEFAULT 250")
                 self.db.execute("PRAGMA user_version=1")
+        if version < 2:
+            with self.db:
+                self.db.execute("BEGIN IMMEDIATE")
+                self.db.execute("ALTER TABLE sessions ADD COLUMN added INTEGER NOT NULL DEFAULT 0")
+                self.db.execute("ALTER TABLE sessions ADD COLUMN removed INTEGER NOT NULL DEFAULT 0")
+                self.db.execute("ALTER TABLE sessions ADD COLUMN revision_metrics INTEGER NOT NULL DEFAULT 0")
+                self.db.execute("PRAGMA user_version=2")
         self.db.execute("UPDATE sessions SET status='interrupted' WHERE status IN ('running','paused')")
         self.db.commit()
 
     def save(self, session: Session):
         values = asdict(session)
         with self.db:
-            self.db.execute("INSERT OR REPLACE INTO sessions VALUES (:id,:started,:mode,:goal,:seconds,:net,:saves,:status,:goal_unit,:pages,:words_per_page)", values)
+            self.db.execute("INSERT OR REPLACE INTO sessions VALUES (:id,:started,:mode,:goal,:seconds,:net,:saves,:status,:goal_unit,:pages,:words_per_page,:added,:removed,:revision_metrics)", values)
 
     def history(self):
         return [Session(**dict(row)) for row in self.db.execute(

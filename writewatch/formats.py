@@ -1,4 +1,4 @@
-"""Read-only adapters. Only integer word counts escape this module."""
+"""Read-only adapters. Extracted text is transient and must never be persisted."""
 from __future__ import annotations
 from html.parser import HTMLParser
 from io import BytesIO
@@ -144,7 +144,8 @@ def epub(archive):
     spine = package.find('spine')
     if spine is None:
         raise ValueError('missing spine')
-    total = consumed = 0
+    parts = []
+    consumed = 0
     seen = set()
     for ref in spine:
         item = manifest[ref.attrib['idref']]
@@ -168,11 +169,11 @@ def epub(archive):
         consumed += len(data)
         if consumed > MAX_BYTES:
             raise ScriptError('This EPUB exceeds the 16 MB text safety limit.')
-        total += count(html_text(decode(data)))
-    return total
+        parts.append(html_text(decode(data)))
+    return "\n".join(parts)
 
 
-def word_count(path: Path) -> int:
+def extract_text(path: Path) -> str:
     """Parse selected file only; never save content, resolve URLs or edit files."""
     try:
         ext = path.suffix.lower()
@@ -194,26 +195,26 @@ def word_count(path: Path) -> int:
             paragraphs = root.find('paragraphs')
             if root.tag != 'document' or paragraphs is None:
                 raise ValueError('not OSF')
-            return sum(count(''.join(''.join(t.itertext()) for t in p.findall('text')))
-                       for p in paragraphs.iter('para'))
+            return '\n'.join(''.join(''.join(t.itertext()) for t in p.findall('text'))
+                             for p in paragraphs.iter('para'))
         if ext == '.fdx':
             root = xml(data)
             body = root.find('Content')
             if root.tag != 'FinalDraft' or body is None:
                 raise ValueError('not FDX')
-            return sum(count(''.join(''.join(t.itertext()) for t in p.findall('Text')))
-                       for p in body.iter('Paragraph'))
+            return '\n'.join(''.join(''.join(t.itertext()) for t in p.findall('Text'))
+                             for p in body.iter('Paragraph'))
         if ext == '.docx':
             root = xml(data)
             body = root.find('body')
             if root.tag != 'document' or body is None:
                 raise ValueError('not DOCX')
-            return count(flow(body, skip={'del','moveFrom','instrText','Fallback'}, only={'t'}))
+            return flow(body, skip={'del','moveFrom','instrText','Fallback'}, only={'t'})
         if ext in ('.odt', '.fodt'):
             body = xml(data).find('./body/text')
             if body is None:
                 raise ValueError('not ODT')
-            return count(flow(body, skip={'annotation','tracked-changes','note','change-info'}))
+            return flow(body, skip={'annotation','tracked-changes','note','change-info'})
         if ext in ('.abw', '.zabw'):
             if ext == '.zabw':
                 with gzip.GzipFile(fileobj=BytesIO(data)) as compressed:
@@ -221,13 +222,13 @@ def word_count(path: Path) -> int:
             root = xml(data)
             if root.tag != 'abiword':
                 raise ValueError('not AbiWord')
-            return sum(count(flow(s, skip={'footnote','endnote','annotation'}))
-                       for s in root.findall('section') if s.get('type', 'doc') == 'doc')
+            return '\n'.join(flow(s, skip={'footnote','endnote','annotation'})
+                             for s in root.findall('section') if s.get('type', 'doc') == 'doc')
         if ext == '.rtf':
             text = data.decode('latin-1')
             if not text.lstrip().startswith('{\\rtf'):
                 raise ValueError('not RTF')
-            return count(rtf_to_text(text, errors='strict'))
+            return rtf_to_text(text, errors='strict')
         if ext == '.pdf':
             # pypdf diagnostics can contain source strings; keep them out of logs.
             logging.getLogger('pypdf').addHandler(logging.NullHandler())
@@ -238,6 +239,7 @@ def word_count(path: Path) -> int:
                 raise ScriptError('Encrypted PDFs are not supported. Use an unencrypted text export.')
             if len(reader.pages) > 1000:
                 raise ScriptError('PDFs are limited to 1,000 pages.')
+            parts = []
             total = size = 0
             for page in reader.pages:
                 text = page.extract_text() or ''
@@ -245,9 +247,10 @@ def word_count(path: Path) -> int:
                 if size > MAX_BYTES:
                     raise ScriptError('This PDF exceeds the text safety limit.')
                 total += count(text)
+                parts.append(text)
             if not total:
                 raise ScriptError('No selectable PDF text found. Export DOCX, RTF or plain text; OCR is not included.')
-            return total
+            return "\n".join(parts)
         text = decode(data)
         if '\x00' in text:
             raise ValueError('binary text')
@@ -258,8 +261,12 @@ def word_count(path: Path) -> int:
             text = html_text(text)
         elif ext == '.fountain':
             text = fountain(text)
-        return count(text)
+        return text
     except ScriptError:
         raise
     except Exception:
         raise ScriptError('Could not read the saved document. Save in your editor, then retry. Plain text must be UTF-8 or BOM-marked UTF-16.') from None
+
+
+def word_count(path: Path) -> int:
+    return count(extract_text(path))

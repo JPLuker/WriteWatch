@@ -1,6 +1,6 @@
 # Remaining work
 
-User priority: #2 → #3 → #4 → #5 → #6 → #7 → #1.
+Desktop priority: finish stabilization and standards work, then release 1.0. Browser/cloud work does not block desktop maintenance mode.
 
 ## Implemented for 0.7.0 validation
 - #2: Page goals, manually entered or explicitly estimated using configurable words per page. Native editor pagination is not inferred.
@@ -12,8 +12,14 @@ User priority: #2 → #3 → #4 → #5 → #6 → #7 → #1.
 
 ## Next
 - Validate the new flow on a real writing session, including negative-count completion.
-- Revision metrics: compare saved text in memory for additions/removals and changed paragraphs; persist only aggregates. Account for moved text, repeated edits and save intervals before claiming reliable totals.
-- #1: Google Drive / OneDrive access needs separate provider integrations and OAuth app registrations. Tablet use additionally needs a supported mobile/web client; adding desktop cloud access alone does not solve it. Existing locally synced supported files already work. No cloud-only access is implemented yet.
+- Validate 0.8.0 revision metrics: cumulative word additions/removals between observed saves; no stored content. Movement and punctuation-only changes are intentionally not counted.
+
+## First priority after desktop 1.0
+- Build a separate WriteWatch Chrome extension for #1. First prototype: Google Docs stays open with its word counter visible; observe that counter for sessions, goals, history and copied summaries.
+- Verify that whole-document counts can be distinguished from selected-text counts, and handle hidden counters, navigation, reloads and multiple tabs without false deltas.
+- No Drive API or Google Cloud setup planned for the counter prototype. Do not promise reliable support until tested against the live editor.
+- Desktop maintenance and browser development remain separate. Tablet support is not implied by a desktop Chrome extension.
+
 
 ## Before a public release
 - Publish only from tagged CI builds; separate untested OS/formats and label them according to release standards.
