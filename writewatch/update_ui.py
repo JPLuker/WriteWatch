@@ -44,7 +44,12 @@ class UpdatesPanel(QWidget):
         self.restart.setEnabled(False)
         self.restart.clicked.connect(self.apply)
         layout.addWidget(self.restart)
+        if self.installation and self.installation.kind == 'deb':
+            self.automatic.setText('Automatically check for updates')
+            self.restart.hide()
+            self.status.setText('Updates are installed through your system package installer. No automatic APT repository is configured.')
         releases = QPushButton('View releases')
+        self.releases_button = releases
         releases.clicked.connect(lambda: QDesktopServices.openUrl(QUrl(RELEASES)))
         layout.addWidget(releases)
         layout.addStretch()
@@ -80,6 +85,7 @@ class UpdatesPanel(QWidget):
         self.cancel_button.show()
         worker.failed.connect(self.status.setText)
         worker.ready.connect(self.downloaded)
+        worker.available.connect(self.update_available)
         worker.finished.connect(self.finished)
         worker.start()
 
@@ -104,6 +110,13 @@ class UpdatesPanel(QWidget):
             self.status.setText('Update check cancelled.')
         self.worker.deleteLater()
         self.worker = None
+
+    def update_available(self, asset):
+        self.status.setText(f"Version {asset['release_version']} is available. Open releases, download the DEB and install it with your system package installer. Your history is kept.")
+        self.releases_button.setText('Download update from releases')
+        self.window.menu_button.setToolTip('Menu — update available')
+        self.window.menu_button.setText('Update available')
+        self.window.menu_button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
 
     def downloaded(self, path, asset):
         self.pending = (path, asset)

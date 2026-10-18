@@ -55,6 +55,8 @@ def installation():
         path = Path(os.environ['APPIMAGE']).absolute()
         if path.is_file() and path.suffix == '.AppImage' and platform.machine() == 'x86_64':
             return Installation('appimage', path, 'x86_64.AppImage')
+    if sys.platform.startswith('linux') and exe == Path('/opt/writewatch/WriteWatch') and platform.machine() == 'x86_64':
+        return Installation('deb', exe.parent, 'amd64.deb')
     return None
 
 
@@ -115,6 +117,7 @@ class UpdateWorker(QThread):
     status = Signal(str)
     progress = Signal(int, int)
     ready = Signal(object, object)
+    available = Signal(object)
     failed = Signal(str)
 
     def __init__(self, install, folder, parent=None):
@@ -136,6 +139,9 @@ class UpdateWorker(QThread):
                 return
             if not asset:
                 self.status.emit('Up to date')
+                return
+            if self.install.kind == 'deb':
+                self.available.emit(asset)
                 return
             self.folder.mkdir(parents=True, exist_ok=True)
             destination = self.folder / asset['name']
@@ -228,6 +234,8 @@ fi
 
 
 def install_update(install, payload, asset):
+    if install.kind == 'deb':
+        raise ValueError('Install Debian updates using your system package installer.')
     verify(payload, asset)  # Verify again immediately before executing.
     if not os.access(install.target.parent, os.W_OK):
         raise ValueError('This installation folder is not writable. Move WriteWatch to a writable folder or install manually.')

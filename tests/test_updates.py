@@ -10,7 +10,7 @@ from unittest.mock import patch
 from PySide6.QtCore import QCoreApplication, QEvent
 from PySide6.QtWidgets import QApplication, QMessageBox
 from writewatch.updates import (Installation, select_release, verify, version, helper_script,
-                                TrustedRedirect, installation, UpdateWorker)
+                                TrustedRedirect, installation, UpdateWorker, install_update)
 from writewatch.update_ui import UpdatesPanel
 from writewatch.app import Window
 from writewatch.core import Store
@@ -63,6 +63,33 @@ class UpdateTests(unittest.TestCase):
             TrustedRedirect().redirect_request(None, None, 302, '', {}, 'https://example.org/payload')
         with self.assertRaises(ValueError):
             TrustedRedirect().redirect_request(None, None, 302, '', {}, 'http://github.com/payload')
+
+    def test_deb_detected_without_enabling_other_linux_copies(self):
+        with patch.object(sys, 'frozen', True, create=True), patch.object(sys, 'platform', 'linux'), patch.dict(os.environ, {'APPIMAGE': ''}), patch('writewatch.updates.platform.machine', return_value='x86_64'):
+            with patch.object(sys, 'executable', '/opt/writewatch/WriteWatch'):
+                self.assertEqual(installation().kind, 'deb')
+                self.assertEqual(installation().suffix, 'amd64.deb')
+            with patch.object(sys, 'executable', '/home/user/WriteWatch/WriteWatch'):
+                self.assertIsNone(installation())
+
+    def test_deb_notifies_without_downloading_or_replacing_package(self):
+        import io
+        import json
+        with tempfile.TemporaryDirectory() as folder:
+            target = Installation('deb', Path('/opt/writewatch'), 'amd64.deb')
+            worker = UpdateWorker(target, Path(folder))
+            available, ready = [], []
+            worker.available.connect(available.append)
+            worker.ready.connect(lambda *args: ready.append(args))
+            with patch('writewatch.updates.opener') as client, patch('writewatch.updates.__version__', '0.4.0'):
+                client.return_value.open.return_value = io.BytesIO(json.dumps([release(suffix='amd64.deb')]).encode())
+                worker.run()
+                self.assertEqual(client.return_value.open.call_count, 1)
+            self.assertEqual(available[0]['release_version'], '0.5.0')
+            self.assertFalse(ready)
+            self.assertFalse(list(Path(folder).iterdir()))
+            with self.assertRaisesRegex(ValueError, 'system package installer'):
+                install_update(target, Path(folder) / 'missing.deb', {})
 
     def test_source_build_is_unmanaged(self):
         with patch.object(sys, 'frozen', False, create=True):
@@ -125,6 +152,29 @@ class UpdateUiTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.app = QApplication.instance() or QApplication([])
+
+    def test_deb_controls_offer_download_instead_of_restart(self):
+        with tempfile.TemporaryDirectory() as folder:
+            store = Store(Path(folder) / 'history.sqlite3')
+            window = Window(store)
+            with patch('writewatch.update_ui.installation', return_value=Installation('deb', Path('/opt/writewatch'), 'amd64.deb')):
+                panel = UpdatesPanel(window, folder)
+            panel.timer.stop()
+            self.assertTrue(panel.check.isEnabled())
+            self.assertTrue(panel.automatic.isEnabled())
+            self.assertTrue(panel.restart.isHidden())
+            self.assertEqual(panel.automatic.text(), 'Automatically check for updates')
+            panel.update_available({'release_version': '0.9.0'})
+            self.assertIn('0.9.0', panel.status.text())
+            self.assertIsNone(panel.pending)
+            self.assertEqual(window.menu_button.text(), 'Update available')
+            with patch('writewatch.update_ui.QDesktopServices.openUrl', return_value=True) as opened:
+                panel.releases_button.click()
+                self.assertEqual(opened.call_args.args[0].toString(), 'https://github.com/JPLuker/WriteWatch/releases')
+            window.deleteLater()
+            QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+            self.app.processEvents()
+            store.close()
 
     def test_active_session_blocks_restart_and_preference_persists(self):
         with tempfile.TemporaryDirectory() as folder:

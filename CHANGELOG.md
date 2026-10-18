@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [0.8.1] — 2026-10-18
+### Fixed
+- Enabled update checks and release-download notices for DEB installations. Package installation remains under the system package manager.
+- Published successful versioned builds as downloadable testing releases with SHA-256 checksums.
+
 ## [0.8.0] — 2026-10-18
 ### Breaking
 - Upgraded history to store revision totals, with a backup for returning to an older version.

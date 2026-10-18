@@ -29,4 +29,4 @@ Desktop priority: finish stabilization and standards work, then release 1.0. Bro
 - Finish dependency/security baseline configuration and documentation.
 - Confirm each main-release format and its upgrade path on actual hardware or a real VM.
 
-Main pushes produce development artifacts; tags prepare drafts. Do not promote an unverified artifact to a tested public release.
+At Joseph’s request, successful versioned main pushes now publish testing prereleases so testing can continue between development sessions. These are not claims of hands-on platform validation. Stable 1.0 publication still requires the checks above.

@@ -60,7 +60,7 @@ jobs:
             dist/*.deb
           if-no-files-found: error
   release:
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
     needs: build
     runs-on: ubuntu-latest
     permissions:
@@ -71,9 +71,14 @@ jobs:
         with:
           path: artifacts
           merge-multiple: true
-      - name: Prepare draft release for validation
+      - name: Publish downloadable testing release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           version=$(python -c 'from writewatch import __version__; print(__version__)')
-          gh release create "v$version" artifacts/* --target "$GITHUB_SHA" --draft --title "WriteWatch v$version" --notes-file RELEASE_NOTES.md
+          (cd artifacts && sha256sum * > SHA256SUMS.txt)
+          if gh release view "v$version" >/dev/null 2>&1; then
+            echo "Release v$version already exists; never replace published binaries. Bump the version for a new build."
+            exit 1
+          fi
+          gh release create "v$version" artifacts/* --target "$GITHUB_SHA" --prerelease --title "WriteWatch v$version — testing build" --notes-file RELEASE_NOTES.md

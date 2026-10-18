@@ -9,7 +9,7 @@ Download the latest **prerelease** from [Releases](https://github.com/JPLuker/Wr
 - **Windows x64:** run `WriteWatch-…-Windows-Setup.exe` (per-user installer), or extract the portable ZIP and run `WriteWatch.exe` inside its folder. Keep `_internal` alongside the executable. The initial builds are unsigned; Windows may show its unknown-publisher prompt.
 - **macOS 15+:** download the AppleSilicon DMG for M-series Macs or the Intel DMG for Intel Macs. Open it and drag WriteWatch into Applications. ZIP bundles are also available. These builds are ad-hoc signed for bundle integrity, but are **not Developer ID signed or notarized**. If the first launch is blocked, use System Settings → Privacy & Security → Open Anyway for this app. See [Mac installation notes](packaging/MAC_INSTALL.md).
 - **Linux x86_64:** make the AppImage executable in its Properties → Permissions and run it. If FUSE is unavailable, launch with `--appimage-extract-and-run`. Alternatively, extract the `.tar.gz` and run `WriteWatch/WriteWatch`. Targets Ubuntu 24.04 and similarly recent distributions (glibc 2.39+); Wayland and X11 use Qt. No keyboard hooks or compositor extensions.
-- Each main-branch build also provides downloads under [Actions](https://github.com/JPLuker/WriteWatch/actions). Main-branch builds provide development artifacts. Tagged builds prepare a draft release for validation before publication.
+- Each main-branch build also provides downloads under [Actions](https://github.com/JPLuker/WriteWatch/actions). Successful versioned main-branch builds publish downloadable testing prereleases after all four platform builds pass. These are available for hands-on testing, not a claim of validation on every desktop. Published binaries are never replaced; each change requires a version bump.
 
 ## Your first session
 
@@ -128,7 +128,7 @@ Use the `amd64.deb` download on Ubuntu 24.04 or newer compatible Debian-based sy
 sudo apt install ./WriteWatch-0.6.1-amd64.deb
 ```
 
-WriteWatch appears in the application menu. Remove with `sudo apt remove writewatch`; personal history remains in your user data folder. Install a newer `.deb` the same way to upgrade. The `.deb` is managed by the system package manager and does not replace itself through the in-app updater. There is no apt repository configured for automatic upgrades. The AppImage remains available and supports in-app updates.
+WriteWatch appears in the application menu. Remove with `sudo apt remove writewatch`; personal history remains in your user data folder. Install a newer `.deb` the same way to upgrade. Starting in 0.8.1, the `.deb` automatically checks for newer versions and shows an update notice with a release-download button. Install 0.8.1 manually once to get these checks. The `.deb` is managed by the system package manager and does not replace itself through the in-app updater. There is no apt repository configured for automatic upgrades. The AppImage remains available and supports in-app updates.
 
 Session setup now uses Writing / Revision and No goal / Set goal toggles. A target appears only for Set goal; writing targets count net words, revision targets count minutes.
 
