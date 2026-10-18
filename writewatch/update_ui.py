@@ -1,11 +1,12 @@
 """Optional background update controls, isolated from writing statistics."""
 from pathlib import Path
+import time
 
 from PySide6.QtCore import QSettings, QTimer, QUrl, Qt
 from PySide6.QtGui import QDesktopServices
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QLabel, QPushButton, QCheckBox, QMessageBox, QProgressBar
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QLabel, QPushButton, QCheckBox, QMessageBox, QProgressBar, QComboBox
 from . import __version__
-from .updates import installation, UpdateWorker, install_update, RELEASES
+from .updates import installation, UpdateWorker, install_update, RELEASES, can_install, automatic_due, updates_disabled
 
 
 class UpdatesPanel(QWidget):
@@ -25,6 +26,15 @@ class UpdatesPanel(QWidget):
         self.automatic.setChecked(self.settings.value('automatic', True, type=bool))
         self.automatic.toggled.connect(self.preference_changed)
         layout.addWidget(self.automatic)
+        layout.addWidget(QLabel('Update channel'))
+        self.channel = QComboBox()
+        self.channel.addItems(['Stable', 'Testing'])
+        self.channel.setAccessibleName('Update channel')
+        self.channel.setCurrentText(self.settings.value('channel', 'Stable'))
+        layout.addWidget(self.channel)
+        hint = QLabel('Stable excludes testing releases. Choose Testing to receive development builds. Automatic checks run at most once a day.')
+        hint.setWordWrap(True)
+        layout.addWidget(hint)
         self.status = QLabel('')
         self.status.setTextFormat(Qt.TextFormat.PlainText)
         self.status.setWordWrap(True)
@@ -44,10 +54,10 @@ class UpdatesPanel(QWidget):
         self.restart.setEnabled(False)
         self.restart.clicked.connect(self.apply)
         layout.addWidget(self.restart)
-        if self.installation and self.installation.kind == 'deb':
+        if self.installation and not can_install(self.installation):
             self.automatic.setText('Automatically check for updates')
             self.restart.hide()
-            self.status.setText('Updates are installed through your system package installer. No automatic APT repository is configured.')
+            self.status.setText('Updates are installed through your system package installer. No automatic APT repository is configured.' if self.installation.kind == 'deb' else 'This copy checks for updates but requires manual installation. Open releases to download a new version.')
         releases = QPushButton('View releases')
         self.releases_button = releases
         releases.clicked.connect(lambda: QDesktopServices.openUrl(QUrl(RELEASES)))
@@ -55,13 +65,30 @@ class UpdatesPanel(QWidget):
         layout.addStretch()
         if not self.installation:
             self.status.setText('Install updates manually for this copy.')
-            self.status.setToolTip('Source and Linux tar builds require manual updates. On Mac, move the app out of the disk image first.')
+            self.status.setToolTip('This source build or unsupported package has no automatic update target. Download a supported package from Releases.')
             self.check.setEnabled(False)
             self.automatic.setEnabled(False)
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.automatic_check)
-        self.timer.start(6 * 60 * 60 * 1000)
+        self.timer.start(60 * 60 * 1000)
+        self.channel.currentTextChanged.connect(self.channel_changed)
         QTimer.singleShot(5000, self.automatic_check)
+
+    def channel_changed(self, channel):
+        self.settings.setValue('channel', channel)
+        self.settings.sync()
+        self.pending = None
+        self.restart.setEnabled(False)
+        self.restart.setObjectName('')
+        self.restart.style().unpolish(self.restart)
+        self.restart.style().polish(self.restart)
+        self.check.setEnabled(bool(self.installation))
+        self.releases_button.setText('View releases')
+        self.window.menu_button.setText('')
+        self.window.menu_button.setToolTip('Menu')
+        self.window.menu_button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly)
+        self.window.tabs.setTabText(self.window.tabs.indexOf(getattr(self.window, 'settings_tab', self)), 'Settings')
+        self.status.setText(f'{channel} channel selected. Check for updates when ready.')
 
     def preference_changed(self, enabled):
         self.settings.setValue('automatic', enabled)
@@ -71,14 +98,29 @@ class UpdatesPanel(QWidget):
             self.status.setText('Stopping automatic update check…')
 
     def automatic_check(self):
-        if self.automatic.isChecked():
+        if not self.automatic.isChecked() or updates_disabled():
+            return
+        now = time.time()
+        last = self.settings.value('last_check', 0)
+        try:
+            if float(last) > now:
+                # Rebase after a clock rollback instead of checking repeatedly.
+                self.settings.setValue('last_check', now)
+                self.settings.sync()
+                return
+        except (TypeError, ValueError):
+            pass
+        if automatic_due(last, now):
             self.check_now()
 
     def check_now(self):
-        if not self.installation or self.pending or (self.worker and self.worker.isRunning()):
+        if updates_disabled() or not self.installation or self.pending or (self.worker and self.worker.isRunning()):
             return
         self.check.setEnabled(False)
-        worker = UpdateWorker(self.installation, self.folder, self)
+        self.channel.setEnabled(False)
+        self.settings.setValue('last_check', time.time())
+        self.settings.sync()
+        worker = UpdateWorker(self.installation, self.folder, self, channel=self.channel.currentText())
         self.worker = worker
         worker.status.connect(self.report_status)
         worker.progress.connect(self.report_progress)
@@ -104,6 +146,7 @@ class UpdatesPanel(QWidget):
 
     def finished(self):
         self.cancel_button.hide()
+        self.channel.setEnabled(True)
         self.progress.hide()
         self.check.setEnabled(not self.pending)
         if self.worker.cancel.is_set():
@@ -112,7 +155,7 @@ class UpdatesPanel(QWidget):
         self.worker = None
 
     def update_available(self, asset):
-        self.status.setText(f"Version {asset['release_version']} is available. Open releases, download the DEB and install it with your system package installer. Your history is kept.")
+        self.status.setText(f"Version {asset['release_version']} is available. Open releases, download the matching package and install it manually. Your history is kept.")
         self.releases_button.setText('Download update from releases')
         self.window.menu_button.setToolTip('Menu — update available')
         self.window.menu_button.setText('Update available')

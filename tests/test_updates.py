@@ -10,7 +10,7 @@ from unittest.mock import patch
 from PySide6.QtCore import QCoreApplication, QEvent
 from PySide6.QtWidgets import QApplication, QMessageBox
 from writewatch.updates import (Installation, select_release, verify, version, helper_script,
-                                TrustedRedirect, installation, UpdateWorker, install_update)
+                                TrustedRedirect, installation, UpdateWorker, install_update, automatic_due, can_install, updates_disabled)
 from writewatch.update_ui import UpdatesPanel
 from writewatch.app import Window
 from writewatch.core import Store
@@ -18,7 +18,7 @@ from writewatch.core import Store
 
 def release(number='0.5.0', suffix='x86_64.AppImage', data=b'new version'):
     name = f'WriteWatch-{number}-{suffix}'
-    return {'tag_name': 'v' + number, 'prerelease': True, 'assets': [{
+    return {'tag_name': 'v' + number, 'prerelease': False, 'assets': [{
         'name': name, 'state': 'uploaded', 'size': len(data),
         'digest': 'sha256:' + hashlib.sha256(data).hexdigest(),
         'browser_download_url': f'https://github.com/JPLuker/WriteWatch/releases/download/v{number}/{name}'}]}
@@ -44,6 +44,49 @@ class UpdateTests(unittest.TestCase):
         del item['assets'][0]['digest']
         with self.assertRaises(ValueError):
             select_release([item], '0.4.0', 'x86_64.AppImage')
+
+    def test_stable_excludes_testing_and_both_reject_downgrades(self):
+        stable, preview = release('0.5.0'), release('0.6.0')
+        preview['prerelease'] = True
+        self.assertEqual(select_release([stable, preview], '0.4.0', 'x86_64.AppImage')['release_version'], '0.5.0')
+        self.assertEqual(select_release([stable, preview], '0.4.0', 'x86_64.AppImage', 'Testing')['release_version'], '0.6.0')
+        self.assertIsNone(select_release([stable, preview], '0.6.0', 'x86_64.AppImage', 'Stable'))
+        self.assertIsNone(select_release([preview], '0.4.0', 'x86_64.AppImage', 'unknown'))
+
+    def test_daily_check_boundary(self):
+        self.assertFalse(automatic_due(1000, 1000 + 86399))
+        self.assertTrue(automatic_due(1000, 1000 + 86400))
+        self.assertFalse(automatic_due(2000, 1000))
+        self.assertTrue(automatic_due('invalid', 1000))
+        self.assertTrue(automatic_due(float('nan'), 1000))
+
+    def test_notify_only_installations_cannot_launch_helper(self):
+        for kind in ('deb', 'mac', 'windows-portable', 'linux-tar'):
+            target = Installation(kind, Path('/app'), '')
+            self.assertFalse(can_install(target))
+            with patch('writewatch.updates.subprocess.Popen') as launch, self.assertRaises(ValueError):
+                install_update(target, Path('/missing'), {})
+            launch.assert_not_called()
+        self.assertTrue(can_install(Installation('appimage', Path('/app'), '')))
+        self.assertTrue(can_install(Installation('windows-setup', Path('/app'), '')))
+
+    def test_windows_registry_policy_is_enforced(self):
+        from unittest.mock import MagicMock
+        registry = MagicMock()
+        registry.REG_DWORD = 4
+        registry.QueryValueEx.return_value = (1, 4)
+        with patch.dict(sys.modules, {'winreg': registry}), patch.object(sys, 'platform', 'win32'), patch.dict(os.environ, {'WRITEWATCH_DISABLE_UPDATES': '0'}):
+            self.assertTrue(updates_disabled())
+            registry.QueryValueEx.return_value = (0, 4)
+            self.assertFalse(updates_disabled())
+            registry.OpenKey.side_effect = OSError('missing')
+            self.assertFalse(updates_disabled())
+
+    def test_environment_policy_prevents_network(self):
+        worker = UpdateWorker(Installation('appimage', Path('/app'), ''), Path('/cache'))
+        with patch.dict(os.environ, {'WRITEWATCH_DISABLE_UPDATES': '1'}), patch('writewatch.updates.opener') as client:
+            worker.run()
+            client.assert_not_called()
 
     def test_checksum_and_size(self):
         with tempfile.TemporaryDirectory() as folder:
@@ -71,7 +114,7 @@ class UpdateTests(unittest.TestCase):
                 self.assertEqual(installation().kind, 'deb')
                 self.assertEqual(installation().suffix, 'amd64.deb')
             with patch.object(sys, 'executable', '/home/user/WriteWatch/WriteWatch'):
-                self.assertIsNone(installation())
+                self.assertEqual(installation().kind, 'linux-tar')
 
     def test_deb_notifies_without_downloading_or_replacing_package(self):
         import io
@@ -172,6 +215,39 @@ class UpdateUiTests(unittest.TestCase):
             with patch('writewatch.update_ui.QDesktopServices.openUrl', return_value=True) as opened:
                 panel.releases_button.click()
                 self.assertEqual(opened.call_args.args[0].toString(), 'https://github.com/JPLuker/WriteWatch/releases')
+            window.deleteLater()
+            QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+            self.app.processEvents()
+            store.close()
+
+    def test_daily_timestamp_survives_reopen_manual_check_bypasses_it(self):
+        with tempfile.TemporaryDirectory() as folder:
+            store = Store(Path(folder) / 'history.sqlite3')
+            window = Window(store)
+            with patch('writewatch.update_ui.installation', return_value=Installation('deb', Path('/app'), 'amd64.deb')):
+                panel = UpdatesPanel(window, folder)
+                panel.timer.stop()
+                panel.automatic.setChecked(True)
+                with patch('writewatch.update_ui.time.time', return_value=100000), patch('writewatch.update_ui.UpdateWorker') as worker:
+                    worker.return_value.isRunning.return_value = False
+                    panel.automatic_check()
+                    worker.return_value.start.assert_called_once()
+                    self.assertEqual(float(panel.settings.value('last_check')), 100000)
+                second = UpdatesPanel(window, folder)
+                second.timer.stop()
+                with patch('writewatch.update_ui.time.time', return_value=100001), patch('writewatch.update_ui.UpdateWorker') as worker:
+                    worker.return_value.isRunning.return_value = False
+                    second.automatic_check()
+                    worker.assert_not_called()
+                    second.check_now()
+                    worker.return_value.start.assert_called_once()
+                    self.assertEqual(worker.call_args.kwargs['channel'], 'Stable')
+                panel.channel.setCurrentText('Testing')
+                self.assertEqual(panel.settings.value('channel'), 'Testing')
+                panel.pending = (Path('/unused'), {})
+                panel.channel.setCurrentText('Stable')
+                self.assertIsNone(panel.pending)
+                self.assertFalse(panel.restart.isEnabled())
             window.deleteLater()
             QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
             self.app.processEvents()

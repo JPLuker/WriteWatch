@@ -4,6 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import hashlib
 import json
+import math
 import os
 from pathlib import Path
 import platform
@@ -24,6 +25,36 @@ from . import __version__
 RELEASES = 'https://github.com/JPLuker/WriteWatch/releases'
 API = 'https://api.github.com/repos/JPLuker/WriteWatch/releases?per_page=50'
 MAX_DOWNLOAD = 600 * 1024 * 1024
+CHECK_INTERVAL = 24 * 60 * 60
+
+
+def updates_disabled():
+    if os.environ.get('WRITEWATCH_DISABLE_UPDATES') == '1':
+        return True
+    if sys.platform == 'win32':
+        import winreg
+        for hive in (winreg.HKEY_LOCAL_MACHINE, winreg.HKEY_CURRENT_USER):
+            try:
+                with winreg.OpenKey(hive, r'SOFTWARE\Policies\WriteWatch') as key:
+                    value, kind = winreg.QueryValueEx(key, 'DisableUpdates')
+                    if kind == winreg.REG_DWORD and value == 1:
+                        return True
+            except OSError:
+                pass
+    return False
+
+
+def can_install(install):
+    return install is not None and install.kind in ('windows-setup', 'appimage')
+
+
+def automatic_due(last, now):
+    try:
+        last = float(last)
+    except (ValueError, TypeError):
+        return True
+    return not math.isfinite(last) or last <= 0 or now - last >= CHECK_INTERVAL
+
 
 
 def version(value):
@@ -48,7 +79,7 @@ def installation():
                             'Windows-Setup.exe' if installed else 'Windows-portable.zip')
     if sys.platform == 'darwin':
         bundle = next((p for p in exe.parents if p.suffix == '.app'), None)
-        if bundle and not str(bundle).startswith('/Volumes/') and 'AppTranslocation' not in str(bundle):
+        if bundle:
             arch = 'AppleSilicon' if platform.machine() == 'arm64' else 'Intel'
             return Installation('mac', bundle, f'macOS-{arch}.zip')
     if sys.platform.startswith('linux') and os.environ.get('APPIMAGE'):
@@ -57,14 +88,16 @@ def installation():
             return Installation('appimage', path, 'x86_64.AppImage')
     if sys.platform.startswith('linux') and exe == Path('/opt/writewatch/WriteWatch') and platform.machine() == 'x86_64':
         return Installation('deb', exe.parent, 'amd64.deb')
+    if sys.platform.startswith('linux') and platform.machine() == 'x86_64':
+        return Installation('linux-tar', exe.parent, 'Linux-x86_64.tar.gz')
     return None
 
 
-def select_release(releases, current, suffix):
+def select_release(releases, current, suffix, channel='Stable'):
     candidates = []
     for release in releases:
         number = version(release.get('tag_name', ''))
-        if release.get('draft') or not number or number <= version(current):
+        if release.get('draft') or (channel != 'Testing' and release.get('prerelease')) or not number or number <= version(current):
             continue
         name = f"WriteWatch-{'.'.join(map(str, number))}-{suffix}"
         for asset in release.get('assets', []):
@@ -120,27 +153,31 @@ class UpdateWorker(QThread):
     available = Signal(object)
     failed = Signal(str)
 
-    def __init__(self, install, folder, parent=None):
+    def __init__(self, install, folder, parent=None, channel='Stable'):
         super().__init__(parent)
         self.install, self.folder = install, folder
+        self.channel = channel
         self.cancel = threading.Event()
 
     def run(self):
         partial = None
         try:
+            if updates_disabled():
+                self.status.emit('Updates are disabled by policy.')
+                return
             client = opener()
             self.status.emit('Checking GitHub releases…')
             with client.open(request(API), timeout=15) as response:
                 raw = response.read(2 * 1024 * 1024 + 1)
             if len(raw) > 2 * 1024 * 1024:
                 raise ValueError('Release response is too large.')
-            asset = select_release(json.loads(raw), __version__, self.install.suffix)
+            asset = select_release(json.loads(raw), __version__, self.install.suffix, self.channel)
             if self.cancel.is_set():
                 return
             if not asset:
-                self.status.emit('Up to date')
+                self.status.emit('No newer compatible release in the selected channel.')
                 return
-            if self.install.kind == 'deb':
+            if not can_install(self.install):
                 self.available.emit(asset)
                 return
             self.folder.mkdir(parents=True, exist_ok=True)
@@ -234,8 +271,10 @@ fi
 
 
 def install_update(install, payload, asset):
-    if install.kind == 'deb':
-        raise ValueError('Install Debian updates using your system package installer.')
+    if updates_disabled():
+        raise ValueError('Updates are disabled by policy.')
+    if not can_install(install):
+        raise ValueError('Install this update manually; DEB updates use your system package installer.')
     verify(payload, asset)  # Verify again immediately before executing.
     if not os.access(install.target.parent, os.W_OK):
         raise ValueError('This installation folder is not writable. Move WriteWatch to a writable folder or install manually.')

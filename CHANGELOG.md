@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+## [0.10.0] — 2026-10-18
+### Added
+- Stable/default and opt-in Testing update channels, preserved in version 2 backups; version 1 backups remain importable.
+- Windows registry policy to disable updater checks and installation.
+### Changed
+- Persist update attempt timestamps across restarts and limit automatic checks to once per 24 hours.
+- Keep restart-to-update for Windows installers and AppImages; make portable Windows, Linux tar/DEB and current macOS builds notify-only.
+- Clear pending downloads from the active update action when switching channels, without downgrading installed versions.
+
 ## [0.9.0] — 2026-10-18
 ### Added
 - Export and import versioned JSON backups of session history, preferences and recent-file paths, without document contents.

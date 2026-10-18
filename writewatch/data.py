@@ -18,11 +18,13 @@ PREFS = {'theme', 'ambient', 'remember', 'recents', 'automatic_updates'}
 def validate(payload):
     if not isinstance(payload, dict) or set(payload) != {'format', 'version', 'sessions', 'settings'}:
         raise ValueError('Not a WriteWatch backup.')
-    if payload['format'] != 'WriteWatch' or type(payload['version']) is not int or payload['version'] != 1:
+    if payload['format'] != 'WriteWatch' or type(payload['version']) is not int or payload['version'] not in (1, 2):
         raise ValueError('Unsupported backup version.')
     rows, prefs = payload['sessions'], payload['settings']
-    if not isinstance(rows, list) or len(rows) > 100000 or not isinstance(prefs, dict) or set(prefs) != PREFS:
+    if not isinstance(rows, list) or len(rows) > 100000 or not isinstance(prefs, dict) or set(prefs) != (PREFS | {'update_channel'} if payload['version'] == 2 else PREFS):
         raise ValueError('Invalid backup structure.')
+    if payload['version'] == 2 and prefs['update_channel'] not in ('Stable', 'Testing'):
+        raise ValueError('Invalid update channel.')
     if prefs['theme'] not in ('System', 'Light', 'Dark'):
         raise ValueError('Invalid theme.')
     for key in ('ambient', 'remember', 'automatic_updates'):
@@ -66,7 +68,7 @@ def validate(payload):
 
 def backup_payload(store, preferences):
     rows = [dict(asdict(s), revision_metrics=bool(s.revision_metrics)) for s in store.history()]
-    payload = {'format': 'WriteWatch', 'version': 1, 'sessions': rows, 'settings': preferences}
+    payload = {'format': 'WriteWatch', 'version': 2, 'sessions': rows, 'settings': dict(preferences, update_channel=preferences.get('update_channel', 'Stable'))}
     validate(payload)
     return payload
 

@@ -226,7 +226,8 @@ class Window(QMainWindow):
         self.ambient_choice.toggled.connect(self.change_appearance)
         QApplication.instance().styleHints().colorSchemeChanged.connect(self.change_appearance)
         self.updates = None
-        if folder is not None and os.environ.get("WRITEWATCH_DISABLE_UPDATES") != "1":
+        from .updates import updates_disabled
+        if folder is not None and not updates_disabled():
             from .update_ui import UpdatesPanel
             self.updates = UpdatesPanel(self, folder)
             layout.addWidget(self.updates)
@@ -264,7 +265,8 @@ class Window(QMainWindow):
         updates = QSettings(str(self.store.path.parent / "updates.ini"), QSettings.Format.IniFormat)
         return dict(theme=self.theme_choice.currentText(), ambient=self.ambient_choice.isChecked(),
                     remember=self.remember_files.isChecked(), recents=self.recent_files(),
-                    automatic_updates=updates.value("automatic", True, type=bool))
+                    automatic_updates=updates.value("automatic", True, type=bool),
+                    update_channel=updates.value("channel", "Stable"))
 
     def export_data(self):
         if not self.data_ready():
@@ -310,8 +312,10 @@ class Window(QMainWindow):
         self.recent_settings.setValue("files", prefs['recents'] if prefs['remember'] else [])
         settings = QSettings(str(self.store.path.parent / "updates.ini"), QSettings.Format.IniFormat)
         settings.setValue("automatic", prefs['automatic_updates'])
+        settings.setValue("channel", prefs.get("update_channel", "Stable"))
         if self.updates:
             self.updates.automatic.setChecked(prefs['automatic_updates'])
+            self.updates.channel.setCurrentText(prefs.get('update_channel', 'Stable'))
         self.change_appearance()
         saved = True
         for item in (self.preferences, self.recent_settings, settings):

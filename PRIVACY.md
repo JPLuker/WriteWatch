@@ -37,6 +37,8 @@ All format adapters operate locally. Links in Markdown, HTML, EPUB, DOCX or othe
 
 ## Optional software updates
 
-Starting with v0.4.0, packaged installations check GitHub's public WriteWatch releases and download compatible updates automatically. This includes preview releases. DEB installations only check and notify; package installation remains manual. Disable **Automatically check and download updates** in Settings → Updates to stop automatic requests; manual checks still work. Source builds do not check automatically.
+Packaged installations can check GitHub's public WriteWatch releases at most daily; the last check attempt is stored locally across restarts. Manual checks are available. Stable is the default update channel and excludes prereleases; Testing must be selected to receive development builds. The selected channel is included in exported backups; operational check timestamps are not.
+
+Windows installers and AppImages download compatible updates. DEB, Linux tar, portable Windows and current macOS builds only check and notify; installation remains manual. Source builds do not check automatically. Disable automatic checks in Settings → Updates to stop automatic requests; manual checks still work. `WRITEWATCH_DISABLE_UPDATES=1` or the documented Windows policy disables updater requests and installation entirely.
 
 Requests contain the app version in the user agent. GitHub and its download infrastructure receive normal connection metadata, including your IP address, and the requested platform-specific asset. No document text, filenames, document paths, goals or session statistics are sent. There is no account, token, analytics or tracking identifier. Preferences and downloaded update packages are stored locally separately from history. Downloads are checked using GitHub's published size and SHA-256 checksum. This verifies integrity against release metadata; it is not an independent publisher signature.

@@ -15,7 +15,7 @@ from writewatch.core import Store, Session
 from writewatch.app import Window
 from writewatch.data import backup_payload, write_backup, read_backup, merge_sessions, delete_owned_data, clear_cache
 
-PREFS = dict(theme='Dark', ambient=False, remember=True, recents=['/private/script.fadein'], automatic_updates=False)
+PREFS = dict(theme='Dark', ambient=False, remember=True, recents=['/private/script.fadein'], automatic_updates=False, update_channel='Testing')
 
 
 class DataTests(unittest.TestCase):
@@ -49,6 +49,14 @@ class DataTests(unittest.TestCase):
         loaded['sessions'][0]['id'] = 'new-session'
         self.assertEqual(merge_sessions(self.store, loaded), 1)
         self.assertEqual(len(self.store.history()), 2)
+
+    def test_legacy_backup_without_channel_still_imports(self):
+        legacy = copy.deepcopy(self.payload)
+        legacy['version'] = 1
+        del legacy['settings']['update_channel']
+        path = self.folder / 'legacy.json'
+        write_backup(path, legacy)
+        self.assertEqual(merge_sessions(self.store, read_backup(path)), 0)
 
     def test_malformed_imports_leave_history_unchanged(self):
         for key, value in [('net', True), ('seconds', float('nan')), ('added', -1), ('goal_unit', 'unknown'), ('revision_metrics', 1), ('started', 'not-a-date')]:

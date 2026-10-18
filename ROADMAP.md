@@ -24,7 +24,7 @@ Desktop priority: finish stabilization and standards work, then release 1.0. Bro
 ## Before a public release
 - Publish only from tagged CI builds; separate untested OS/formats and label them according to release standards.
 - Standardize asset names, grouped downloads and SHA256SUMS.txt.
-- Align update channels, cadence and installation-type policies with the new standards.
+- Validate 0.10.0 update channels, persistent daily cadence and installation-type policies on actual desktops; automated coverage is in place.
 - Finish storage-location migration and automatic cache/log retention. Export/import/deletion, data-folder access, diagnostics and manual cache/log clearing are implemented in 0.9.0.
 - Finish dependency/security baseline configuration and documentation.
 - Confirm each main-release format and its upgrade path on actual hardware or a real VM.

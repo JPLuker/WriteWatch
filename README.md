@@ -102,15 +102,25 @@ CI runs parser, session, privacy, clipboard and UI tests on Windows, Linux, Appl
 
 0.8.0 is in development with 12 format families / 20 file extensions. No official relationship with Fade In. This repository currently grants no license to WriteWatch source; Joseph retains rights. Dependency notices are in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
-## Automatic updates (v0.4.0+)
+## Updates (0.10.0+)
 
-Install v0.4.0 manually once to enable future updates. WriteWatch checks GitHub five seconds after launch and every six hours, including preview releases, then downloads the newest compatible version in the background. Turn this off in **Updates**, or use **Check for updates** manually. Downloads are verified against GitHub's size and SHA-256 metadata. Offline or failed checks leave the current app usable.
+In **Settings → Updates**, choose **Stable** (the default) or **Testing**. Stable ignores GitHub prereleases; Testing includes them. Select **Testing** to receive our ongoing development builds. Neither channel downgrades your installed version. Switching channels clears any pending update from the previous channel; use **Check for updates** to check the new selection.
 
-When **Update ready** appears, finish your session and select **Restart to Update**. Windows installer and portable builds, Linux AppImages, and installed macOS apps support this flow. The helper waits for WriteWatch to exit; it does not force-close a session. Session history remains in the app data folder. Portable, AppImage and Mac updates retain the previous app alongside the replacement with a `.previous-…` suffix for recovery. You can remove that backup after confirming the new version works. Downloaded installers are retained in the app data `updates` folder.
+Automatic checks run at most once per 24 hours, with the last attempt saved across restarts. A manual check is always available and starts a new 24-hour window. Failures count as attempts to avoid repeated network requests. Clock rollback rebases the timestamp and postpones automatic checks for a day. Disable the automatic checkbox to stop automatic checks; source builds make no automatic requests.
 
-Run an AppImage from a writable folder. On Mac, first move WriteWatch out of the DMG into a writable Applications folder; disk-image and App Translocation launches cannot update themselves. Source and Linux tar builds use manual installation. macOS builds remain ad-hoc signed, not notarized. Updates do not bypass macOS security settings. Installation errors are recorded in `updates/last-update.log` in the app data folder.
+| Installation | Update behavior |
+| --- | --- |
+| Windows installer | Check, verify and download; restart to run the installer |
+| Linux AppImage | Check, verify and download; restart to replace the AppImage |
+| Windows portable | Check and notify; download and replace manually |
+| Linux DEB | Check and notify; install the new DEB through the system package installer |
+| Linux tar archive | Check and notify; download and replace manually |
+| Current macOS builds | Check and notify; install manually (ad-hoc signed, not notarized) |
+| Source | Manual updates |
 
-Set `WRITEWATCH_DISABLE_UPDATES=1` to disable the updater completely, including network access, for managed deployments and tests.
+Downloads are verified against GitHub's file size and SHA-256 metadata. Finish your session before restarting to update. AppImages must be in a writable folder and keep the previous executable with a `.previous-…` suffix for recovery. History stays in the app data folder. Cached installers and logs can be cleared in **Data & storage**. DEB packages do not configure an APT repository.
+
+Set `WRITEWATCH_DISABLE_UPDATES=1` to disable updater checks and installation entirely. Windows administrators can also set `DisableUpdates` (DWORD `1`) under `HKLM\SOFTWARE\Policies\WriteWatch` or `HKCU\SOFTWARE\Policies\WriteWatch`; either enabled policy disables the updater. Installation failures are recorded in `updates/last-update.log`.
 
 ## Appearance
 
@@ -158,6 +168,6 @@ Finish your active session, then open **Settings → Data & storage**:
 - **Clear update downloads and logs** removes cached packages and updater logs, including any pending downloaded update; check again to download it later. History and preferences are kept.
 - **Delete all app data…** confirms removal of history, settings, recent paths, migration backups, updater downloads and logs, then quits. Documents and exported JSON backups are kept. This is not forensic secure erasure and cannot remove operating-system backups.
 
-Backup format version 1 accepts up to 32 MB. Unknown versions, unsupported fields, invalid measurements and inconsistent revision totals are rejected. Data controls that change or export data are unavailable during sessions or update checks/downloads.
+Backup format version 2 includes the update-channel preference and accepts up to 32 MB. Version 1 backups remain importable and select Stable; 0.9.0 cannot import version 2 exports. Unknown versions, unsupported fields, invalid measurements and inconsistent revision totals are rejected. Data controls that change or export data are unavailable during sessions or update checks/downloads.
 
 **About → Copy diagnostic info** copies the app version, operating system, architecture and local data/log locations. It contains no recent document paths, document contents or session statistics; local storage paths may contain your account name. Nothing is sent automatically.
