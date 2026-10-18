@@ -1,6 +1,7 @@
 import os
 os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
 import sqlite3
+from contextlib import closing
 import tempfile
 import unittest
 from pathlib import Path
@@ -128,7 +129,7 @@ class MigrationTests(unittest.TestCase):
     def test_legacy_migration_preserves_history_and_backup(self):
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder) / 'history.sqlite3'
-            with sqlite3.connect(path) as db:
+            with closing(sqlite3.connect(path)) as db, db:
                 db.execute('CREATE TABLE sessions (id TEXT PRIMARY KEY, started TEXT, mode TEXT, goal INTEGER, seconds REAL, net INTEGER, saves INTEGER, status TEXT)')
                 db.execute("INSERT INTO sessions VALUES ('old','2026-10-17T12:00:00+00:00','Revision',30,900,-100,2,'done')")
             original = path.read_bytes()
@@ -137,7 +138,7 @@ class MigrationTests(unittest.TestCase):
             self.assertEqual((session.unit, session.progress, session.net), ('minutes', .5, -100))
             store.close()
             backup = Path(str(path) + '.backup-v0')
-            with sqlite3.connect(backup) as db:
+            with closing(sqlite3.connect(backup)) as db:
                 self.assertEqual(db.execute('PRAGMA user_version').fetchone()[0], 0)
                 self.assertEqual(db.execute('SELECT net FROM sessions').fetchone()[0], -100)
                 self.assertEqual(len(db.execute('PRAGMA table_info(sessions)').fetchall()), 8)
@@ -149,7 +150,7 @@ class MigrationTests(unittest.TestCase):
     def test_newer_database_is_not_modified(self):
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder) / 'history.sqlite3'
-            with sqlite3.connect(path) as db:
+            with closing(sqlite3.connect(path)) as db, db:
                 db.execute('PRAGMA user_version=99')
             before = path.read_bytes()
             with self.assertRaisesRegex(ValueError, 'newer version'):

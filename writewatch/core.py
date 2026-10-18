@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, asdict
+from contextlib import closing
 from datetime import datetime
 from pathlib import Path
 import sqlite3
@@ -153,7 +154,7 @@ class Store:
             raise ValueError("This data was saved by a newer version. Update WriteWatch to open it.")
         exists = self.db.execute("SELECT 1 FROM sqlite_master WHERE name='sessions'").fetchone()
         if version == 0 and exists:
-            with sqlite3.connect(str(path) + ".backup-v0") as backup:
+            with closing(sqlite3.connect(str(path) + ".backup-v0")) as backup:
                 self.db.backup(backup)
 
         self.db.row_factory = sqlite3.Row
