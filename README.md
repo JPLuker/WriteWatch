@@ -147,3 +147,17 @@ Revision sessions show **words added** and **words removed** in the active view,
 The parser extracts text locally, then builds session-keyed word fingerprints in memory. No text or fingerprints are saved in history or sent anywhere. Only numeric totals persist. Switching session mode retains totals for the whole session. Older sessions do not acquire invented revision totals.
 
 History schema version 2 backs up the previous database before adding these numeric fields. Keep the backup if you need to return to an older WriteWatch version.
+
+## Backups and data controls (0.9.0+)
+
+Finish your active session, then open **Settings → Data & storage**:
+
+- **Export everything…** saves an open, versioned JSON backup of completed/interrupted sessions, appearance/update preferences and recent-file paths. It contains no document text. Keep the backup private if your file paths are sensitive.
+- **Import backup…** validates the entire backup before adding history. Existing session IDs win; importing the same backup twice does not duplicate sessions. Appearance, update preferences and recent files are replaced after confirmation. New history rows are committed together or rolled back together. A settings-write failure is reported separately.
+- **Open data folder** opens the local storage location.
+- **Clear update downloads and logs** removes cached packages and updater logs, including any pending downloaded update; check again to download it later. History and preferences are kept.
+- **Delete all app data…** confirms removal of history, settings, recent paths, migration backups, updater downloads and logs, then quits. Documents and exported JSON backups are kept. This is not forensic secure erasure and cannot remove operating-system backups.
+
+Backup format version 1 accepts up to 32 MB. Unknown versions, unsupported fields, invalid measurements and inconsistent revision totals are rejected. Data controls that change or export data are unavailable during sessions or update checks/downloads.
+
+**About → Copy diagnostic info** copies the app version, operating system, architecture and local data/log locations. It contains no recent document paths, document contents or session statistics; local storage paths may contain your account name. Nothing is sent automatically.

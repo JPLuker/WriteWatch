@@ -19,6 +19,12 @@ No filename, path, script title, character name, word list, content fingerprint 
 
 History is stored in Qt's AppLocalDataLocation (normally `%LOCALAPPDATA%/WriteWatch/WriteWatch` on Windows and `~/.local/share/WriteWatch/WriteWatch` on Linux, and `~/Library/Application Support/WriteWatch/WriteWatch` on macOS). An optional `WRITEWATCH_DATA_DIR` environment variable overrides that storage folder (useful for portable installs). History → Delete history clears completed/interrupted rows and vacuums the database. This is not forensic secure erasure and cannot delete OS backups. Removing the app does not automatically erase history.
 
+## Backups and deletion
+
+Settings → Data & storage exports session statistics, preferences and recent-file paths to a JSON file you choose. Exports contain no document contents; filenames and paths in the recent list may still be sensitive. Import validates the full backup, merges session history without overwriting matching IDs and replaces preferences after confirmation. No backup is uploaded.
+
+Delete all app data removes the app-owned history database, migration backups, preferences, recent-file list, update cache and update logs, then quits. It preserves documents, exported backups and unrelated files in the same directory. It does not securely erase disk sectors or remove OS/cloud backups. Cache clearing keeps history and preferences. About can copy diagnostics containing app/OS versions and local storage paths (which may include your account name), but no document paths or contents. Diagnostics are not sent automatically.
+
 ## Sharing
 
 The Done dialog shows the exact text copied. It contains only session type when relevant, date, duration, net words, revision additions/removals when collected, labeled page measurements and goal progress. The optional PNG is rendered from those same numeric/session fields. No script text or image of the editor is included. The clipboard or a saved PNG can be retained by your OS, backup tools or clipboard-sync service. Posting to your group is your action.
@@ -31,6 +37,6 @@ All format adapters operate locally. Links in Markdown, HTML, EPUB, DOCX or othe
 
 ## Optional software updates
 
-Starting with v0.4.0, packaged installations check GitHub's public WriteWatch releases and download compatible updates automatically. This includes preview releases. Disable **Automatically check and download updates** in the Updates tab to stop automatic requests; manual checks still work. Source builds do not check automatically.
+Starting with v0.4.0, packaged installations check GitHub's public WriteWatch releases and download compatible updates automatically. This includes preview releases. DEB installations only check and notify; package installation remains manual. Disable **Automatically check and download updates** in Settings → Updates to stop automatic requests; manual checks still work. Source builds do not check automatically.
 
 Requests contain the app version in the user agent. GitHub and its download infrastructure receive normal connection metadata, including your IP address, and the requested platform-specific asset. No document text, filenames, document paths, goals or session statistics are sent. There is no account, token, analytics or tracking identifier. Preferences and downloaded update packages are stored locally separately from history. Downloads are checked using GitHub's published size and SHA-256 checksum. This verifies integrity against release metadata; it is not an independent publisher signature.

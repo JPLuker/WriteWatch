@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [0.9.0] — 2026-10-18
+### Added
+- Export and import versioned JSON backups of session history, preferences and recent-file paths, without document contents.
+- Validate imports before writing and merge history transactionally, preserving existing session IDs.
+- Open the data folder, clear update downloads/logs, and delete all app-owned data with confirmation before quitting.
+- Copy diagnostic information from About without document names or contents.
+
 ## [0.8.1] — 2026-10-18
 ### Fixed
 - Enabled update checks and release-download notices for DEB installations. Package installation remains under the system package manager.

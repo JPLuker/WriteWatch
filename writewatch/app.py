@@ -5,8 +5,8 @@ from pathlib import Path
 import sys
 import os
 
-from PySide6.QtCore import Qt, QTimer, QStandardPaths, QLockFile, QSettings
-from PySide6.QtGui import QColor, QFont, QPainter, QPixmap, QIcon
+from PySide6.QtCore import Qt, QTimer, QStandardPaths, QLockFile, QSettings, QUrl
+from PySide6.QtGui import QColor, QFont, QPainter, QPixmap, QIcon, QDesktopServices
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QPushButton, QFileDialog, QComboBox, QSpinBox, QFrame, QProgressBar,
@@ -236,12 +236,149 @@ class Window(QMainWindow):
         self.remember_files.toggled.connect(self.set_remember_files)
         layout.addWidget(self.remember_files)
         layout.addWidget(button("Clear recent files", self.clear_recents))
+        layout.addWidget(label("Data & storage", "section"))
+        layout.addWidget(button("Export everything…", self.export_data))
+        layout.addWidget(button("Import backup…", self.import_data))
+        layout.addWidget(button("Open data folder", self.open_data_folder))
+        layout.addWidget(button("Clear update downloads and logs", self.clear_update_cache))
+        delete_data = button("Delete all app data…", self.delete_all_data)
+        delete_data.setObjectName("destructive")
+        layout.addWidget(delete_data)
         layout.addStretch()
         layout.addWidget(button("About WriteWatch", self.show_about))
         self.add_scroll_tab(page, "Settings")
         self.settings_tab = self.tabs.widget(self.tabs.count() - 1)
         if folder is not None:
             self.change_appearance()
+
+    def data_ready(self):
+        if self.tracker:
+            QMessageBox.information(self, "Finish your session first", "Finish your session before managing app data.")
+            return False
+        if self.updates and self.updates.worker and self.updates.worker.isRunning():
+            QMessageBox.information(self, "Update in progress", "Wait for the update check or cancel it before managing app data.")
+            return False
+        return True
+
+    def export_preferences(self):
+        updates = QSettings(str(self.store.path.parent / "updates.ini"), QSettings.Format.IniFormat)
+        return dict(theme=self.theme_choice.currentText(), ambient=self.ambient_choice.isChecked(),
+                    remember=self.remember_files.isChecked(), recents=self.recent_files(),
+                    automatic_updates=updates.value("automatic", True, type=bool))
+
+    def export_data(self):
+        if not self.data_ready():
+            return
+        from .data import backup_payload, write_backup
+        destination = str(Path(QStandardPaths.writableLocation(QStandardPaths.StandardLocation.DocumentsLocation)) / "WriteWatch-backup.json")
+        path, _ = QFileDialog.getSaveFileName(self, "Export history, settings and recent-file paths", destination, "JSON backup (*.json)")
+        if not path:
+            return
+        if not path.lower().endswith('.json'):
+            path += '.json'
+        try:
+            write_backup(path, backup_payload(self.store, self.export_preferences()))
+        except (OSError, ValueError, TypeError):
+            QMessageBox.warning(self, "Export failed", "Could not save the backup. Check the destination and free space.")
+            return
+        QMessageBox.information(self, "Backup saved", "History, settings and recent-file paths were exported. Document contents are not included.")
+
+    def import_data(self):
+        if not self.data_ready():
+            return
+        from .data import read_backup, merge_sessions
+        path, _ = QFileDialog.getOpenFileName(self, "Import WriteWatch backup", "", "JSON backup (*.json)")
+        if not path:
+            return
+        try:
+            payload = read_backup(path)
+        except (OSError, ValueError):
+            QMessageBox.warning(self, "Invalid backup", "This backup could not be read or validated. Existing data is unchanged.")
+            return
+        choice = QMessageBox.question(self, "Import backup?", f"Import {len(payload['sessions'])} sessions and replace settings and recent files? Existing session IDs will be kept.", QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No, QMessageBox.StandardButton.No)
+        if choice != QMessageBox.StandardButton.Yes:
+            return
+        try:
+            added = merge_sessions(self.store, payload)
+        except Exception:
+            QMessageBox.warning(self, "Import failed", "History could not be imported. Existing data is unchanged.")
+            return
+        prefs = payload['settings']
+        self.theme_choice.setCurrentText(prefs['theme'])
+        self.ambient_choice.setChecked(prefs['ambient'])
+        self.remember_files.setChecked(prefs['remember'])
+        self.recent_settings.setValue("files", prefs['recents'] if prefs['remember'] else [])
+        settings = QSettings(str(self.store.path.parent / "updates.ini"), QSettings.Format.IniFormat)
+        settings.setValue("automatic", prefs['automatic_updates'])
+        if self.updates:
+            self.updates.automatic.setChecked(prefs['automatic_updates'])
+        self.change_appearance()
+        saved = True
+        for item in (self.preferences, self.recent_settings, settings):
+            if item is not None:
+                item.sync()
+                saved = saved and item.status() == QSettings.Status.NoError
+        self.refresh_history()
+        if saved:
+            QMessageBox.information(self, "Backup imported", f"Imported {added} new sessions. Existing sessions were kept.")
+        else:
+            QMessageBox.warning(self, "Settings could not be saved", "History was imported, but some settings could not be saved. Check folder permissions and free space.")
+
+    def open_data_folder(self):
+        QDesktopServices.openUrl(QUrl.fromLocalFile(str(self.store.path.parent)))
+
+    def clear_update_cache(self):
+        if not self.data_ready():
+            return
+        from .data import clear_cache
+        try:
+            clear_cache(self.store.path.parent)
+        except OSError:
+            QMessageBox.warning(self, "Could not clear downloads", "Some update files could not be removed. Check folder permissions.")
+            return
+        if self.updates:
+            self.updates.pending = None
+            self.updates.restart.setEnabled(False)
+            self.updates.restart.setObjectName("")
+            self.updates.restart.style().unpolish(self.updates.restart)
+            self.updates.restart.style().polish(self.updates.restart)
+            self.updates.check.setEnabled(bool(self.updates.installation))
+            self.updates.status.setText("Update downloads and logs cleared.")
+            self.tabs.setTabText(self.tabs.indexOf(self.settings_tab), "Settings")
+            self.menu_button.setText("")
+            self.menu_button.setToolTip("Menu")
+            self.menu_button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly)
+        QMessageBox.information(self, "Downloads cleared", "Update downloads and logs were removed. Your history and settings were kept.")
+
+    def copy_diagnostics(self):
+        import platform
+        text = (f"WriteWatch {__version__}\nOS: {platform.system()} {platform.release()}\n"
+                f"Architecture: {platform.machine()}\nHistory schema: 2\n"
+                f"Data folder: {self.store.path.parent}\nUpdate log: {self.store.path.parent / 'updates' / 'last-update.log'}")
+        QApplication.clipboard().setText(text)
+
+    def delete_all_data(self):
+        if not self.data_ready():
+            return
+        choice = QMessageBox.question(self, "Delete all app data?", "Permanently delete history, settings, recent files, migration backups, update downloads and logs, then quit? Documents and exported backups are kept. This cannot be undone.", QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No, QMessageBox.StandardButton.No)
+        if choice != QMessageBox.StandardButton.Yes:
+            return
+        from .data import delete_owned_data
+        self.timer.stop()
+        if self.updates:
+            self.updates.timer.stop()
+            self.updates.automatic.setChecked(False)
+        for item in (self.preferences, self.recent_settings, self.updates.settings if self.updates else None):
+            if item is not None:
+                item.clear()
+                item.sync()
+        self.store.close()
+        try:
+            delete_owned_data(self.store.path.parent)
+        except OSError:
+            QMessageBox.warning(self, "Some app data remains", "Some files could not be deleted. WriteWatch will quit. Remove remaining app files from the data folder manually.")
+        self.close()
+        QApplication.instance().quit()
 
     def show_about(self):
         dialog = QDialog(self)
@@ -255,6 +392,7 @@ class Window(QMainWindow):
         for page, title in zip(self.about_pages, ("Formats", "Privacy")):
             sections.addItem(page, title)
         layout.addWidget(sections)
+        layout.addWidget(button("Copy diagnostic info", self.copy_diagnostics))
         layout.addWidget(button("Close", dialog.accept))
         dialog.exec()
         for page in self.about_pages:
