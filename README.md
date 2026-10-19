@@ -171,3 +171,21 @@ Finish your active session, then open **Settings → Data & storage**:
 Backup format version 2 includes the update-channel preference and accepts up to 32 MB. Version 1 backups remain importable and select Stable; 0.9.0 cannot import version 2 exports. Unknown versions, unsupported fields, invalid measurements and inconsistent revision totals are rejected. Data controls that change or export data are unavailable during sessions or update checks/downloads.
 
 **About → Copy diagnostic info** copies the app version, operating system, architecture and local data/log locations. It contains no recent document paths, document contents or session statistics; local storage paths may contain your account name. Nothing is sent automatically.
+
+## Storage and retention (0.11.0+)
+
+History and preferences now use standard platform locations. Existing default-location data is copied automatically on first launch; an existing destination history is never overwritten. SQLite's backup API includes committed WAL data. Both old and new locations are locked while this version is running. Failed migrations preserve the original files and can be retried after fixing permissions or disk space.
+
+| Platform | History and preferences | Update cache | Update logs |
+| --- | --- | --- | --- |
+| Windows | `%APPDATA%/io.github.jpluker.writewatch` | `%LOCALAPPDATA%/io.github.jpluker.writewatch/cache` | `%LOCALAPPDATA%/io.github.jpluker.writewatch/logs` |
+| Linux | `$XDG_DATA_HOME/writewatch` | `$XDG_CACHE_HOME/writewatch` | `$XDG_STATE_HOME/writewatch/logs` |
+| macOS | `~/Library/Application Support/io.github.jpluker.writewatch` | `~/Library/Caches/io.github.jpluker.writewatch` | `~/Library/Logs/io.github.jpluker.writewatch` |
+
+Linux defaults are `~/.local/share`, `~/.cache`, and `~/.local/state` when the respective XDG variable is unset or relative. **Open data folder** and **Copy diagnostic info** show the actual locations.
+
+`WRITEWATCH_DATA_DIR` continues to use exactly the specified folder for history/settings, with `updates` and `logs` subfolders; it does not migrate another profile. For a portable Windows profile, create an empty `WriteWatch.portable` file beside `WriteWatch.exe`; storage then lives in an adjacent `data` folder. An explicit environment override takes precedence over the marker. Portable profiles start independently; import an exported backup to transfer history.
+
+Original default-location data remains as a recovery copy. Older app versions still use that old location, so do not alternate versions expecting their histories to stay synchronized. **Delete all app data** also removes retained app-owned legacy files, preserving documents and exported backups. Removing only the new data folder manually can cause legacy data to be imported again.
+
+Startup and daily cleanup remove recognized update downloads/helpers/logs older than 14 days. A currently pending update is protected, and cleanup is deferred while an update worker runs. Rotated update logs share a 10 MB retention budget; logs modified within the last minute are left alone for active helpers and reconsidered at the next cleanup. Unknown files, directories and symlinks are not followed or removed by automatic cleanup. Manual cache clearing remains available. Migration recovery copies are retained until full app-data deletion; AppImage executable rollback copies beside the app are also kept for manual recovery.

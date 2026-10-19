@@ -124,6 +124,7 @@ def remove_owned(path):
 
 def clear_cache(folder):
     remove_owned(Path(folder) / 'updates')
+    remove_owned(Path(folder) / 'logs')
 
 
 def delete_owned_data(folder):

@@ -192,6 +192,11 @@ class DataUiTests(unittest.TestCase):
         self.assertEqual(self.window.tabs.tabText(self.window.tabs.indexOf(self.window.settings_tab)), 'Settings')
 
     def test_delete_cancel_preserves_data_then_confirm_quits(self):
+        from writewatch.storage import Storage
+        legacy = self.folder / 'legacy'
+        legacy.mkdir()
+        (legacy / 'history.sqlite3').write_text('old history')
+        self.window.storage = Storage(self.folder, self.folder / 'updates', self.folder / 'logs', legacy)
         doc = self.folder / 'script.fadein'
         doc.write_text('private document')
         with patch.object(QMessageBox, 'question', return_value=QMessageBox.StandardButton.No):
@@ -201,4 +206,5 @@ class DataUiTests(unittest.TestCase):
             self.window.delete_all_data()
             quit_app.assert_called_once()
         self.assertFalse(self.store.path.exists())
+        self.assertFalse((legacy / 'history.sqlite3').exists())
         self.assertEqual(doc.read_text(), 'private document')

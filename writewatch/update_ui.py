@@ -13,7 +13,8 @@ class UpdatesPanel(QWidget):
     def __init__(self, window, folder):
         super().__init__(window)
         self.window = window
-        self.folder = Path(folder) / 'updates'
+        self.folder = window.storage.cache
+        self.logs = window.storage.logs
         self.installation = installation()
         self.worker = None
         self.pending = None
@@ -182,7 +183,7 @@ class UpdatesPanel(QWidget):
         if self.worker and self.worker.isRunning():
             return
         try:
-            install_update(self.installation, *self.pending)
+            install_update(self.installation, *self.pending, log_folder=self.logs)
         except Exception as error:
             QMessageBox.warning(self, 'Could not install update', str(error))
             return

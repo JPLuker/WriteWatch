@@ -270,7 +270,7 @@ fi
     return script
 
 
-def install_update(install, payload, asset):
+def install_update(install, payload, asset, log_folder=None):
     if updates_disabled():
         raise ValueError('Updates are disabled by policy.')
     if not can_install(install):
@@ -299,6 +299,11 @@ def install_update(install, payload, asset):
         options = {'creationflags': subprocess.CREATE_NO_WINDOW | subprocess.DETACHED_PROCESS}
     else:
         command, options = ['/bin/sh', str(helper)], {'start_new_session': True}
-    with (payload.parent / 'last-update.log').open('wb') as log:
+    logs = Path(log_folder) if log_folder is not None else payload.parent
+    logs.mkdir(parents=True, exist_ok=True)
+    previous = logs / 'last-update.log'
+    if previous.exists():
+        previous.replace(logs / ('last-update-' + token + '.log'))
+    with previous.open('wb') as log:
         subprocess.Popen(command, stdin=subprocess.DEVNULL, stdout=log, stderr=log,
                          cwd=str(payload.parent), env=env, **options)

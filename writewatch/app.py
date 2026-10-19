@@ -143,9 +143,11 @@ class ShareDialog(QDialog):
 
 
 class Window(QMainWindow):
-    def __init__(self, store, update_folder=None):
+    def __init__(self, store, update_folder=None, storage=None):
         super().__init__()
         self.store = store
+        from .storage import Storage
+        self.storage = storage or Storage.local(store.path.parent)
         self.recent_settings = QSettings(str(store.path.parent / "recents.ini"), QSettings.Format.IniFormat)
         self.recent_settings.setValue("format_version", 1)
         self.path = None
@@ -337,6 +339,11 @@ class Window(QMainWindow):
         from .data import clear_cache
         try:
             clear_cache(self.store.path.parent)
+            from .data import remove_owned
+            remove_owned(self.storage.cache)
+            remove_owned(self.storage.logs)
+            if self.storage.legacy:
+                clear_cache(self.storage.legacy)
         except OSError:
             QMessageBox.warning(self, "Could not clear downloads", "Some update files could not be removed. Check folder permissions.")
             return
@@ -358,7 +365,7 @@ class Window(QMainWindow):
         import platform
         text = (f"WriteWatch {__version__}\nOS: {platform.system()} {platform.release()}\n"
                 f"Architecture: {platform.machine()}\nHistory schema: 2\n"
-                f"Data folder: {self.store.path.parent}\nUpdate log: {self.store.path.parent / 'updates' / 'last-update.log'}")
+                f"Data folder: {self.store.path.parent}\nCache folder: {self.storage.cache}\nUpdate log: {self.storage.logs / 'last-update.log'}")
         QApplication.clipboard().setText(text)
 
     def delete_all_data(self):
@@ -378,7 +385,12 @@ class Window(QMainWindow):
                 item.sync()
         self.store.close()
         try:
+            if self.storage.legacy:
+                delete_owned_data(self.storage.legacy)
             delete_owned_data(self.store.path.parent)
+            from .data import remove_owned
+            remove_owned(self.storage.cache)
+            remove_owned(self.storage.logs)
         except OSError:
             QMessageBox.warning(self, "Some app data remains", "Some files could not be deleted. WriteWatch will quit. Remove remaining app files from the data folder manually.")
         self.close()
@@ -955,14 +967,23 @@ def main():
     app.setStyle("Fusion")
     app.setStyleSheet(STYLE)
     app.setWindowIcon(icon())
-    folder = Path(os.environ.get("WRITEWATCH_DATA_DIR") or QStandardPaths.writableLocation(QStandardPaths.StandardLocation.AppLocalDataLocation))
-    folder.mkdir(parents=True, exist_ok=True)
-    lock = QLockFile(str(folder / "writewatch.lock"))
-    lock.setStaleLockTime(0)
-    if not lock.tryLock(0):
-        QMessageBox.information(None, "WriteWatch is open", "WriteWatch is already running for this user.")
-        return 0
+    from .storage import locations, migrate, cleanup
+    storage = locations(QStandardPaths.writableLocation(QStandardPaths.StandardLocation.AppLocalDataLocation))
+    folder = storage.data
+    locks = []
     try:
+        folder.mkdir(parents=True, exist_ok=True)
+        lock_folders = [folder]
+        if storage.legacy and storage.legacy.is_dir():
+            lock_folders.append(storage.legacy)
+        for lock_folder in lock_folders:
+            lock = QLockFile(str(lock_folder / "writewatch.lock"))
+            lock.setStaleLockTime(0)
+            if not lock.tryLock(0):
+                QMessageBox.information(None, "WriteWatch is open", "Close other WriteWatch versions before continuing.")
+                return 0
+            locks.append(lock)
+        migrate(storage)
         store = Store(folder / "history.sqlite3")
     except ValueError as error:
         QMessageBox.critical(None, "History unavailable", str(error))
@@ -970,9 +991,20 @@ def main():
     except Exception:
         QMessageBox.critical(None, "History unavailable", "WriteWatch could not open local history. Check disk space and folder permissions.")
         return 1
-    window = Window(store, update_folder=folder)
+    cleanup(storage)
+    window = Window(store, update_folder=folder, storage=storage)
+    retention = QTimer(window)
+    def maintain_storage():
+        panel = window.updates
+        if panel and panel.worker and panel.worker.isRunning():
+            return
+        protected = [panel.pending[0]] if panel and panel.pending else []
+        cleanup(storage, protected=protected)
+    retention.timeout.connect(maintain_storage)
+    retention.start(24 * 60 * 60 * 1000)
     window.show()
     result = app.exec()
     store.close()
-    lock.unlock()
+    for lock in locks:
+        lock.unlock()
     return result

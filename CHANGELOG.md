@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+## [0.11.0] — 2026-10-18
+### Added
+- Standard platform storage directories with copy-first migration of history/settings and locks for both old and new profiles.
+- Separate update cache/log locations; explicit custom profiles and Windows portable marker support.
+- Startup/daily updater cleanup with 14-day retention, pending-download protection and a 10 MB inactive-log budget.
+### Changed
+- Rotate update logs and include new cache/log locations in diagnostics.
+- Clear retained legacy app-owned data during full deletion to prevent reimporting deleted history.
+
 ## [0.10.0] — 2026-10-18
 ### Added
 - Stable/default and opt-in Testing update channels, preserved in version 2 backups; version 1 backups remain importable.
