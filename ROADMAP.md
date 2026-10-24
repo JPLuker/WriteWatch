@@ -11,6 +11,7 @@ Desktop priority: finish stabilization and standards work, then release 1.0. Bro
 - #7: Default Writing label omitted from text summaries; Revision retained.
 
 ## Next
+- Validate 0.12.0 per-mode metric selections, defaults, copied/image summaries and preference backup/restore. User-requested customization is implemented for the 12 available saved-file metrics; keyboard-event metrics require a separate tracking design and are not promised.
 - Validate the new flow on a real writing session, including negative-count completion.
 - Validate 0.8.0 revision metrics: cumulative word additions/removals between observed saves; no stored content. Movement and punctuation-only changes are intentionally not counted.
 

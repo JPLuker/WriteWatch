@@ -12,10 +12,11 @@ os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
 from PySide6.QtCore import QCoreApplication, QEvent
 from PySide6.QtWidgets import QApplication, QFileDialog, QMessageBox
 from writewatch.core import Store, Session
+from writewatch.metrics import default_preferences
 from writewatch.app import Window
 from writewatch.data import backup_payload, write_backup, read_backup, merge_sessions, delete_owned_data, clear_cache
 
-PREFS = dict(theme='Dark', ambient=False, remember=True, recents=['/private/script.fadein'], automatic_updates=False, update_channel='Testing')
+PREFS = dict(theme='Dark', ambient=False, remember=True, recents=['/private/script.fadein'], automatic_updates=False, update_channel='Testing', metrics=default_preferences())
 
 
 class DataTests(unittest.TestCase):
@@ -54,6 +55,7 @@ class DataTests(unittest.TestCase):
         legacy = copy.deepcopy(self.payload)
         legacy['version'] = 1
         del legacy['settings']['update_channel']
+        del legacy['settings']['metrics']
         path = self.folder / 'legacy.json'
         write_backup(path, legacy)
         self.assertEqual(merge_sessions(self.store, read_backup(path)), 0)

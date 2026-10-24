@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+## [0.12.0] — 2026-10-24
+### Added
+- Twelve configurable saved-file session metrics with separate Writing/Revision selections and reset-to-default controls.
+- Apply selections to live sessions, session reviews, copied text and share images, and hide disabled word/time history values.
+- Add derived change totals, session-average pace, changed observations, changes per observation and removal share.
+### Changed
+- Export metric preferences in backup format 3; versions 1 and 2 remain importable. History schema is unchanged.
+- Omit unavailable measurements rather than inventing values for old sessions or zero denominators. Disabled metrics remain tracked as aggregate statistics.
+
 ## [0.11.2] — 2026-10-24
 ### Fixed
 - Standardize platform/architecture download names and group release links by platform.

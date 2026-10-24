@@ -10,6 +10,7 @@ import shutil
 import tempfile
 
 from .core import Session
+from .metrics import default_preferences, validate_preferences
 
 MAX_BACKUP = 32 * 1024 * 1024
 PREFS = {'theme', 'ambient', 'remember', 'recents', 'automatic_updates'}
@@ -18,13 +19,15 @@ PREFS = {'theme', 'ambient', 'remember', 'recents', 'automatic_updates'}
 def validate(payload):
     if not isinstance(payload, dict) or set(payload) != {'format', 'version', 'sessions', 'settings'}:
         raise ValueError('Not a WriteWatch backup.')
-    if payload['format'] != 'WriteWatch' or type(payload['version']) is not int or payload['version'] not in (1, 2):
+    if payload['format'] != 'WriteWatch' or type(payload['version']) is not int or payload['version'] not in (1, 2, 3):
         raise ValueError('Unsupported backup version.')
     rows, prefs = payload['sessions'], payload['settings']
-    if not isinstance(rows, list) or len(rows) > 100000 or not isinstance(prefs, dict) or set(prefs) != (PREFS | {'update_channel'} if payload['version'] == 2 else PREFS):
+    if not isinstance(rows, list) or len(rows) > 100000 or not isinstance(prefs, dict) or set(prefs) != (PREFS | ({'update_channel'} if payload['version'] >= 2 else set()) | ({'metrics'} if payload['version'] == 3 else set())):
         raise ValueError('Invalid backup structure.')
-    if payload['version'] == 2 and prefs['update_channel'] not in ('Stable', 'Testing'):
+    if payload['version'] >= 2 and prefs['update_channel'] not in ('Stable', 'Testing'):
         raise ValueError('Invalid update channel.')
+    if payload['version'] == 3:
+        validate_preferences(prefs['metrics'])
     if prefs['theme'] not in ('System', 'Light', 'Dark'):
         raise ValueError('Invalid theme.')
     for key in ('ambient', 'remember', 'automatic_updates'):
@@ -68,7 +71,7 @@ def validate(payload):
 
 def backup_payload(store, preferences):
     rows = [dict(asdict(s), revision_metrics=bool(s.revision_metrics)) for s in store.history()]
-    payload = {'format': 'WriteWatch', 'version': 2, 'sessions': rows, 'settings': dict(preferences, update_channel=preferences.get('update_channel', 'Stable'))}
+    payload = {'format': 'WriteWatch', 'version': 3, 'sessions': rows, 'settings': dict(preferences, update_channel=preferences.get('update_channel', 'Stable'), metrics=preferences.get('metrics', default_preferences()))}
     validate(payload)
     return payload
 
@@ -131,7 +134,7 @@ def delete_owned_data(folder):
     """Preserve arbitrary siblings, including documents and user-exported backups."""
     folder = Path(folder)
     clear_cache(folder)
-    for name in ('appearance.ini', 'updates.ini', 'recents.ini'):
+    for name in ('appearance.ini', 'updates.ini', 'recents.ini', 'metrics.ini'):
         remove_owned(folder / name)
     for path in folder.glob('history.sqlite3.backup-v*'):
         if re.fullmatch(r'history\.sqlite3\.backup-v\d+', path.name):

@@ -55,7 +55,7 @@ def icon():
     return QIcon(pix)
 
 
-def card(session: Session) -> QPixmap:
+def card(session: Session, enabled=None) -> QPixmap:
     """Render only explicit public metrics. No filename or content input exists."""
     pix = QPixmap(1200, 720)
     pix.fill(QColor(DARK["canvas"]))
@@ -71,20 +71,16 @@ def card(session: Session) -> QPixmap:
     date = datetime.fromisoformat(session.started).strftime("%B %d, %Y")
     status = "Complete" if session.status == "done" else "Interrupted"
     p.drawText(64, 215, f"{session.mode} session  /  {date}  /  {status}")
-    p.setPen(QColor(DARK["text"]))
-    p.setFont(QFont(QApplication.font().family(), 39, QFont.Weight.DemiBold))
-    minutes, seconds = divmod(int(session.seconds), 60)
-    p.drawText(64, 465, f"{minutes}m {seconds:02d}s")
-    p.drawText(640, 465, f"{session.page_count:,.1f}" if session.unit in ("pages", "estimated_pages") else f"{session.net:+,}")
-    p.setFont(QFont(QApplication.font().family(), 17))
-    p.setPen(QColor(DARK["secondary"]))
-    p.drawText(64, 510, "Session time")
-    p.drawText(640, 510, {"pages": "Pages (self-reported)", "estimated_pages": "Estimated pages"}.get(session.unit, "Net words"))
-    goal_text = f"{session.goal_result}  /  {session.goal_label}" if session.goal else "No goal set"
-    if session.mode == "Revision" and session.revision_metrics:
-        p.drawText(64, 560, f"{session.added:,} words added  /  {session.removed:,} words removed")
-    p.drawText(64, 610, goal_text)
-    p.setFont(QFont(QApplication.font().family(), 13))
+    from .metrics import rows, defaults
+    selected = rows(session, defaults(session.mode) if enabled is None else enabled)
+    for index, (_, title, value) in enumerate(selected):
+        x, y = 64 + (index % 2) * 560, 280 + (index // 2) * 66
+        p.setPen(QColor(DARK['text']))
+        p.setFont(QFont(QApplication.font().family(), 21, QFont.Weight.DemiBold))
+        p.drawText(x, y, value)
+        p.setPen(QColor(DARK['secondary']))
+        p.setFont(QFont(QApplication.font().family(), 13))
+        p.drawText(x, y + 24, title)
     p.end()
     return pix
 
@@ -92,6 +88,8 @@ def card(session: Session) -> QPixmap:
 class ShareDialog(QDialog):
     def __init__(self, session, parent=None, review=False):
         super().__init__(parent)
+        from .metrics import defaults, rows, summary
+        self.enabled = parent.enabled_metrics(session.mode) if parent is not None and hasattr(parent, 'enabled_metrics') else defaults(session.mode)
         self.setWindowTitle("Your session · WriteWatch")
         self.resize(620, 410)
         layout = QVBoxLayout(self)
@@ -107,9 +105,7 @@ class ShareDialog(QDialog):
             details.setContentsMargins(20, 16, 20, 16)
             minutes, seconds = divmod(int(session.seconds), 60)
             state = "Completed" if session.status == "done" else "Interrupted — last saved checkpoint"
-            for text in (f"{session.mode} · {state}", f"Session time: {minutes}m {seconds:02d}s",
-                         f"Net words: {session.net:+,}", f"Goal: {session.goal_label}",
-                         session.goal_result if session.goal else "No goal set"):
+            for text in [f"{session.mode} · {state}"] + [f"{title}: {value}" for _, title, value in rows(session, self.enabled)]:
                 item = label(text)
                 item.setWordWrap(True)
                 details.addWidget(item)
@@ -118,7 +114,7 @@ class ShareDialog(QDialog):
             panel.hide()
             layout.addWidget(details_toggle)
             layout.addWidget(panel)
-        self.text = QPlainTextEdit(session.summary())
+        self.text = QPlainTextEdit(summary(session, self.enabled))
         self.text.setReadOnly(True)
         self.text.setMinimumHeight(180)
         layout.addWidget(self.text)
@@ -138,7 +134,7 @@ class ShareDialog(QDialog):
         if path:
             if not path.lower().endswith(".png"):
                 path += ".png"
-            if not card(session).save(path, "PNG"):
+            if not card(session, self.enabled).save(path, "PNG"):
                 QMessageBox.warning(self, "Image not saved", "Choose a writable folder and try again.")
 
 
@@ -148,6 +144,7 @@ class Window(QMainWindow):
         self.store = store
         from .storage import Storage
         self.storage = storage or Storage.local(store.path.parent)
+        self.metric_settings = QSettings(str(store.path.parent / "metrics.ini"), QSettings.Format.IniFormat)
         self.recent_settings = QSettings(str(store.path.parent / "recents.ini"), QSettings.Format.IniFormat)
         self.recent_settings.setValue("format_version", 1)
         self.path = None
@@ -233,6 +230,7 @@ class Window(QMainWindow):
             from .update_ui import UpdatesPanel
             self.updates = UpdatesPanel(self, folder)
             layout.addWidget(self.updates)
+        layout.addWidget(button("Metrics…", self.edit_metrics))
         layout.addWidget(label("Files", "section"))
         self.remember_files = QCheckBox("Remember recent files")
         self.remember_files.setChecked(self.recent_settings.value("remember", True, type=bool))
@@ -254,6 +252,63 @@ class Window(QMainWindow):
         if folder is not None:
             self.change_appearance()
 
+    def enabled_metrics(self, mode):
+        from .metrics import CATALOG, defaults
+        value = self.metric_settings.value(mode, None)
+        return defaults(mode) if value is None else [key for key in str(value).split(',') if key in CATALOG]
+
+    def metric_preferences(self):
+        return {mode: self.enabled_metrics(mode) for mode in ('Writing', 'Revision')}
+
+    def edit_metrics(self):
+        from .metrics import CATALOG, defaults
+        dialog = QDialog(self)
+        dialog.setWindowTitle('Session metrics')
+        dialog.resize(560, 650)
+        body = QVBoxLayout(dialog)
+        mode = QComboBox()
+        mode.addItems(['Writing', 'Revision'])
+        mode.setCurrentText(self.mode.currentText())
+        body.addWidget(mode)
+        note = label('Choose what appears during sessions, in reviews and in shared text/images. Saved-file measurements are not keystroke tracking.')
+        note.setWordWrap(True)
+        body.addWidget(note)
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        content = QWidget()
+        choices = QVBoxLayout(content)
+        checks = {}
+        pending = self.metric_preferences()
+        for key, (title, help_text) in CATALOG.items():
+            control = QCheckBox(title)
+            control.setToolTip(help_text)
+            checks[key] = control
+            choices.addWidget(control)
+            control.toggled.connect(lambda checked, key=key: pending.__setitem__(mode.currentText(), [k for k, c in checks.items() if c.isChecked()]))
+        scroll.setWidget(content)
+        body.addWidget(scroll)
+        def load_mode():
+            for key, control in checks.items():
+                control.blockSignals(True)
+                control.setChecked(key in pending[mode.currentText()])
+                control.blockSignals(False)
+        mode.currentTextChanged.connect(load_mode)
+        def reset():
+            pending[mode.currentText()] = defaults(mode.currentText())
+            load_mode()
+        body.addWidget(button('Reset this mode to defaults', reset))
+        actions = QHBoxLayout()
+        actions.addWidget(button('Cancel', dialog.reject))
+        actions.addWidget(button('Save', dialog.accept, True))
+        body.addLayout(actions)
+        load_mode()
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            for name, enabled in pending.items():
+                self.metric_settings.setValue(name, ','.join(enabled))
+            self.metric_settings.sync()
+            self.update_view()
+            self.refresh_history()
+
     def data_ready(self):
         if self.tracker:
             QMessageBox.information(self, "Finish your session first", "Finish your session before managing app data.")
@@ -268,7 +323,7 @@ class Window(QMainWindow):
         return dict(theme=self.theme_choice.currentText(), ambient=self.ambient_choice.isChecked(),
                     remember=self.remember_files.isChecked(), recents=self.recent_files(),
                     automatic_updates=updates.value("automatic", True, type=bool),
-                    update_channel=updates.value("channel", "Stable"))
+                    update_channel=updates.value("channel", "Stable"), metrics=self.metric_preferences())
 
     def export_data(self):
         if not self.data_ready():
@@ -308,6 +363,9 @@ class Window(QMainWindow):
             QMessageBox.warning(self, "Import failed", "History could not be imported. Existing data is unchanged.")
             return
         prefs = payload['settings']
+        from .metrics import default_preferences
+        for mode, enabled in prefs.get('metrics', default_preferences()).items():
+            self.metric_settings.setValue(mode, ','.join(enabled))
         self.theme_choice.setCurrentText(prefs['theme'])
         self.ambient_choice.setChecked(prefs['ambient'])
         self.remember_files.setChecked(prefs['remember'])
@@ -320,7 +378,7 @@ class Window(QMainWindow):
             self.updates.channel.setCurrentText(prefs.get('update_channel', 'Stable'))
         self.change_appearance()
         saved = True
-        for item in (self.preferences, self.recent_settings, settings):
+        for item in (self.preferences, self.recent_settings, self.metric_settings, settings):
             if item is not None:
                 item.sync()
                 saved = saved and item.status() == QSettings.Status.NoError
@@ -379,7 +437,7 @@ class Window(QMainWindow):
         if self.updates:
             self.updates.timer.stop()
             self.updates.automatic.setChecked(False)
-        for item in (self.preferences, self.recent_settings, self.updates.settings if self.updates else None):
+        for item in (self.preferences, self.recent_settings, self.metric_settings, self.updates.settings if self.updates else None):
             if item is not None:
                 item.clear()
                 item.sync()
@@ -543,6 +601,9 @@ class Window(QMainWindow):
         self.revision_counts.setWordWrap(True)
         self.revision_counts.setToolTip("Cumulative word additions and removals between observed saves. Moving words and punctuation-only edits are not counted.")
         body.addWidget(self.revision_counts)
+        self.extra_metrics = label("", "muted")
+        self.extra_metrics.setWordWrap(True)
+        body.addWidget(self.extra_metrics)
         layout.addWidget(panel)
         self.message = label("Save in your editor to update progress.", "muted")
         self.message.setWordWrap(True)
@@ -887,6 +948,22 @@ class Window(QMainWindow):
         self.goal_caption.setVisible(has_goal)
         self.progress.setVisible(has_goal)
         self.progress.setValue(percent)
+        from .metrics import rows
+        enabled = self.enabled_metrics(session.mode if active else self.mode.currentText())
+        self.pages_row.setVisible(active and session.unit == 'pages' and ('pages' in enabled or 'goal' in enabled))
+        self.time_label.setVisible('time' in enabled)
+        self.words.setVisible(('pages' if estimated else 'net') in enabled)
+        self.words_caption.setVisible(('pages' if estimated else 'net') in enabled)
+        for widget in (self.percent, self.goal_caption, self.progress):
+            widget.setVisible(has_goal and 'goal' in enabled)
+        self.revision_counts.hide()
+        if active:
+            extra = [(title, value) for key, title, value in rows(session, enabled) if key not in ('time', 'goal', 'pages' if estimated else 'net')]
+            self.extra_metrics.setText('\n'.join(f'{title}: {value}' for title, value in extra))
+            self.extra_metrics.setVisible(bool(extra))
+        else:
+            self.extra_metrics.hide()
+
 
     def refresh_history(self, *_):
         all_sessions = self.store.history()
@@ -898,12 +975,18 @@ class Window(QMainWindow):
                         if (mode == "All sessions" or s.mode == mode)
                         and (days_back is None or today - timedelta(days=days_back - 1)
                              <= datetime.fromisoformat(s.started).astimezone().date() <= today)]
+        self.table.setColumnHidden(2, not any('time' in self.enabled_metrics(mode) for mode in ('Writing', 'Revision')))
+        self.table.setColumnHidden(3, not any('net' in self.enabled_metrics(mode) for mode in ('Writing', 'Revision')))
         self.table.setRowCount(len(self.history))
         for row, session in enumerate(self.history):
             date = datetime.fromisoformat(session.started).astimezone().strftime("%Y-%m-%d %H:%M")
             minutes, seconds = divmod(int(session.seconds), 60)
             values = [date, session.mode + (" (interrupted)" if session.status == "interrupted" else ""),
                       f"{minutes}m {seconds:02d}s", f"{session.net:+,}", session.goal_label, session.goal_result]
+            enabled = self.enabled_metrics(session.mode)
+            for col, key in ((2, "time"), (3, "net"), (4, "goal"), (5, "goal")):
+                if key not in enabled:
+                    values[col] = "—"
             for col, value in enumerate(values):
                 item = QTableWidgetItem(value)
                 if col in (2, 3):
@@ -921,8 +1004,14 @@ class Window(QMainWindow):
         while day in days:
             streak += 1
             day -= timedelta(days=1)
-        self.totals.setText(f"This week: {len(week)} sessions · {int(sum(s.seconds for s in week) / 60)} minutes · "
-                            f"{sum(s.net for s in week):+,} net words     |     {streak}-day streak")
+        # Session count/streak describe history; omit aggregate word/time totals
+        # when their per-mode display preferences differ or are disabled.
+        parts = [f'This week: {len(week)} sessions']
+        if all('time' in self.enabled_metrics(mode) for mode in ('Writing', 'Revision')):
+            parts.append(f'{int(sum(s.seconds for s in week) / 60)} minutes')
+        if all('net' in self.enabled_metrics(mode) for mode in ('Writing', 'Revision')):
+            parts.append(f'{sum(s.net for s in week):+,} net words')
+        self.totals.setText(' · '.join(parts) + f' | {streak}-day streak')
         if self.history:
             self.table.selectRow(0)
 

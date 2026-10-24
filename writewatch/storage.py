@@ -66,7 +66,7 @@ def migrate(storage):
     if old is None or not old.is_dir() or (target / 'history.sqlite3').exists():
         return False
     target.mkdir(parents=True, exist_ok=True)
-    sources = [old / n for n in ('appearance.ini', 'updates.ini', 'recents.ini')]
+    sources = [old / n for n in ('appearance.ini', 'updates.ini', 'recents.ini', 'metrics.ini')]
     sources += [p for p in old.glob('history.sqlite3.backup-v*') if re.fullmatch(r'history\.sqlite3\.backup-v\d+', p.name)]
     for source in sources:
         dest = target / source.name

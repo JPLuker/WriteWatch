@@ -29,6 +29,10 @@ Settings → Data & storage exports session statistics, preferences and recent-f
 
 Delete all app data removes the app-owned history database, migration backups, preferences, recent-file list, update cache and update logs, then quits. It preserves documents, exported backups and unrelated files in the same directory. It does not securely erase disk sectors or remove OS/cloud backups. Cache clearing keeps history and preferences. About can copy diagnostics containing app/OS versions and local storage paths (which may include your account name), but no document paths or contents. Diagnostics are not sent automatically.
 
+## Metric preferences
+
+Settings → Metrics selects which aggregate measurements appear in sessions, reviews, copied summaries and images, separately for Writing and Revision. Preferences are saved in metrics.ini and exported in backup format 3. Hiding a metric does not stop aggregate tracking; it can be displayed again later. This feature adds derived numbers, not keyboard monitoring, typing accuracy, backspace counts, active-time detection or stored document contents. Unavailable historical metrics are omitted.
+
 ## Sharing
 
 The Done dialog shows the exact text copied. It contains only session type when relevant, date, duration, net words, revision additions/removals when collected, labeled page measurements and goal progress. The optional PNG is rendered from those same numeric/session fields. No script text or image of the editor is included. The clipboard or a saved PNG can be retained by your OS, backup tools or clipboard-sync service. Posting to your group is your action.

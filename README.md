@@ -195,3 +195,18 @@ Startup and daily cleanup remove recognized update downloads/helpers/logs older 
 Release notes group downloads by platform. Canonical names include platform and architecture, such as `WriteWatch-0.11.2-Linux-x64.deb`, `WriteWatch-0.11.2-Windows-x64-Setup.exe`, and `WriteWatch-0.11.2-macOS-arm64.dmg`.
 
 Older filenames remain attached as identical compatibility aliases so previously shipped updaters keep working. New updater clients prefer canonical names and fall back to the legacy name. SHA256SUMS.txt covers both sets, and publication rejects mismatched aliases. Choose downloads from the table in the release notes; duplicate names in the asset list are compatibility copies, not different builds.
+
+## Custom session metrics (0.12.0+)
+
+Open **Settings → Metrics…** and choose Writing or Revision. Each mode has its own toggles, a reset-to-defaults button, and Save/Cancel. Writing defaults to time, net words, pages when applicable and goal progress. Revision additionally shows additions/removals. You can select none, a few, or all 12 metrics:
+
+- Session time; net words; words added; words removed; total word changes.
+- Net words per minute; word changes per minute.
+- Observed changes; word changes per observation; removal share.
+- Pages (manual or explicitly estimated); goal progress.
+
+Selections apply to the live session, individual history reviews, copied summaries and share images. Disabled net-word/time values are omitted from history rows and aggregate word/time totals where appropriate. Session counts, dates, mode and history streak remain navigation/context information.
+
+Toggles control display and sharing, not collection: local aggregate session statistics continue to be recorded so metrics can be re-enabled later. There is still no keystroke logging or stored script content. Pace divides saved word changes by the manual session clock; it is **not typing speed or active typing time**. Observed changes are saves/polls where word occurrences changed, **not every editor save**. Ratios with zero denominators and unavailable historical revision measurements are omitted. Word movement, punctuation-only edits and changes undone between observations are not captured.
+
+Metric selections are stored in `metrics.ini` and included in JSON backup format 3. Versions 1/2 still import with default metric selections; older apps cannot import version 3 exports. Import replaces metric preferences after confirmation. History database schema remains version 2. Full app-data deletion removes metric preferences too.

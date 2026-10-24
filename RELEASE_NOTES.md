@@ -1,9 +1,9 @@
-- Standardized download filenames to include platform and architecture, with grouped download links above.
-- Kept identical legacy filename aliases so older updaters continue to work. New clients prefer canonical names and retain legacy fallback.
-- Release validation rejects mismatched aliases and checksums cover every attached package.
+- Added Settings → Metrics with 12 toggles, separate Writing/Revision defaults, reset, and Save/Cancel.
+- Selections control live sessions, individual history reviews, copied summaries and share images. Disable any or all session metrics.
+- Added total word changes, session-average net/change pace, changed observations, changes per observation and removal share alongside time, net/add/remove words, pages and goals.
+- These are saved-file measurements, not keystroke counts, typing accuracy or active typing time. Disabled metrics continue to be tracked as local aggregate statistics. Unavailable historical data and zero-denominator rates are omitted.
+- Metric preferences use backup format 3. Older version 1/2 backups remain importable with default metric selections; older apps cannot import new exports. The history database format is unchanged.
 
-No changes to session tracking, history schema or backup format. Includes the storage migration, cleanup, update policies and security maintenance work from previous releases.
+Testing release. Hands-on session, upgrade/migration and backup validation remain before 1.0. Choose Settings → Updates → Testing for development builds.
 
-Testing release: automated tests and package checks are complete when this release is published. Hands-on sessions, upgrades and migration testing remain for the 1.0 validation pass. Repository security settings remain unverified through the available connector.
-
-Select Settings → Updates → Testing for development builds. Requires Windows x64, Linux glibc 2.39+, or macOS 15+. Windows binaries are unsigned; Mac bundles are not notarized. DEB installation uses the system package installer.
+Requires Windows x64, Linux glibc 2.39+, or macOS 15+. Windows binaries are unsigned; Mac bundles are not notarized. DEB installation uses the system package installer.
