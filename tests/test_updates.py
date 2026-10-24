@@ -53,6 +53,15 @@ class UpdateTests(unittest.TestCase):
         self.assertIsNone(select_release([stable, preview], '0.6.0', 'x86_64.AppImage', 'Stable'))
         self.assertIsNone(select_release([preview], '0.4.0', 'x86_64.AppImage', 'unknown'))
 
+    def test_canonical_assets_preferred_with_legacy_fallback(self):
+        item = release('0.12.0')
+        old = item['assets'][0]
+        canonical = dict(old, name='WriteWatch-0.12.0-Linux-x64.AppImage', browser_download_url='https://github.com/JPLuker/WriteWatch/releases/download/v0.12.0/WriteWatch-0.12.0-Linux-x64.AppImage')
+        item['assets'].append(canonical)
+        self.assertEqual(select_release([item], '0.11.0', 'x86_64.AppImage')['name'], canonical['name'])
+        item['assets'] = [old]
+        self.assertEqual(select_release([item], '0.11.0', 'x86_64.AppImage')['name'], old['name'])
+
     def test_daily_check_boundary(self):
         self.assertFalse(automatic_due(1000, 1000 + 86399))
         self.assertTrue(automatic_due(1000, 1000 + 86400))

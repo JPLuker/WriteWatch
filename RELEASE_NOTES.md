@@ -1,9 +1,9 @@
-- Added a release gate that requires all nine expected packages, rejects empty or unexpected files, checks tag/version consistency for tag builds, and generates a complete checksum manifest.
-- Added grouped weekly dependency update checks for Python packages and GitHub Actions, plus private vulnerability-reporting guidance.
-- Includes 0.11.0 storage migration and updater retention. Existing default-location history/settings are copied automatically, preserving original files for recovery. Custom profiles stay in place.
+- Standardized download filenames to include platform and architecture, with grouped download links above.
+- Kept identical legacy filename aliases so older updaters continue to work. New clients prefer canonical names and retain legacy fallback.
+- Release validation rejects mismatched aliases and checksums cover every attached package.
 
-No changes to session tracking, history schema or backup format in this maintenance patch. Repository-level security settings still need administrator verification; the new configuration does not establish that they are enabled.
+No changes to session tracking, history schema or backup format. Includes the storage migration, cleanup, update policies and security maintenance work from previous releases.
 
-Testing release. Automated tests and packaging checks do not replace hands-on upgrade/migration validation before 1.0. Choose Settings → Updates → Testing to receive development builds.
+Testing release: automated tests and package checks are complete when this release is published. Hands-on sessions, upgrades and migration testing remain for the 1.0 validation pass. Repository security settings remain unverified through the available connector.
 
-Requires Windows x64, Linux glibc 2.39+, or macOS 15+. Windows builds are unsigned; Mac builds are not notarized. DEB installation remains managed by the system package installer. SHA256SUMS.txt is included.
+Select Settings → Updates → Testing for development builds. Requires Windows x64, Linux glibc 2.39+, or macOS 15+. Windows binaries are unsigned; Mac bundles are not notarized. DEB installation uses the system package installer.

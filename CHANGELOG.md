@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [0.11.2] — 2026-10-24
+### Fixed
+- Standardize platform/architecture download names and group release links by platform.
+- Preserve identical legacy filename aliases for older updaters; prefer canonical names in new clients with legacy fallback.
+- Validate alias contents and include all published packages in the checksum manifest.
+
 ## [0.11.1] — 2026-10-24
 ### Fixed
 - Block publication of incomplete, empty or mismatched release package sets; generate checksums only after validation.

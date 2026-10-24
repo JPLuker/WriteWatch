@@ -189,3 +189,9 @@ Linux defaults are `~/.local/share`, `~/.cache`, and `~/.local/state` when the r
 Original default-location data remains as a recovery copy. Older app versions still use that old location, so do not alternate versions expecting their histories to stay synchronized. **Delete all app data** also removes retained app-owned legacy files, preserving documents and exported backups. Removing only the new data folder manually can cause legacy data to be imported again.
 
 Startup and daily cleanup remove recognized update downloads/helpers/logs older than 14 days. A currently pending update is protected, and cleanup is deferred while an update worker runs. Rotated update logs share a 10 MB retention budget; logs modified within the last minute are left alone for active helpers and reconsidered at the next cleanup. Unknown files, directories and symlinks are not followed or removed by automatic cleanup. Manual cache clearing remains available. Migration recovery copies are retained until full app-data deletion; AppImage executable rollback copies beside the app are also kept for manual recovery.
+
+## Download names (0.11.2+)
+
+Release notes group downloads by platform. Canonical names include platform and architecture, such as `WriteWatch-0.11.2-Linux-x64.deb`, `WriteWatch-0.11.2-Windows-x64-Setup.exe`, and `WriteWatch-0.11.2-macOS-arm64.dmg`.
+
+Older filenames remain attached as identical compatibility aliases so previously shipped updaters keep working. New updater clients prefer canonical names and fall back to the legacy name. SHA256SUMS.txt covers both sets, and publication rejects mismatched aliases. Choose downloads from the table in the release notes; duplicate names in the asset list are compatibility copies, not different builds.

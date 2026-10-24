@@ -23,7 +23,7 @@ Desktop priority: finish stabilization and standards work, then release 1.0. Bro
 
 ## Before a public release
 - Publish only from tagged CI builds; separate untested OS/formats and label them according to release standards.
-- Standardize asset names, grouped downloads and SHA256SUMS.txt.
+- Implemented in 0.11.2: canonical platform/architecture names, grouped download links and complete checksums, with identical legacy aliases for updater compatibility.
 - Validate 0.10.0 update channels, persistent daily cadence and installation-type policies on actual desktops; automated coverage is in place.
 - Validate 0.11.0 storage migration and retention on actual desktops. Export/import/deletion, data-folder access, diagnostics, migration and automatic updater-file cleanup are implemented.
 - Verify repository-level private reporting, secret scanning, push protection and dependency alerts with administrator access. Weekly grouped Dependabot checks, SECURITY.md and complete-release validation are implemented in 0.11.1; server-side security settings remain unverified.

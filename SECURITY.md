@@ -19,6 +19,6 @@ See PRIVACY.md for data handling and README.md for storage locations and update 
 
 ## Maintenance and release checks
 
-Dependabot checks Python requirements and GitHub Actions weekly, grouping routine updates for review. Updates are not automatically merged. Actions are pinned by commit SHA. Tests and package startup checks run on Windows, Linux and both Mac architectures before publishing testing releases. The release gate requires every expected package, rejects unexpected/empty packages, verifies tag/version consistency for tag builds, and generates SHA256SUMS.txt from the validated files.
+Dependabot checks Python requirements and GitHub Actions weekly, grouping routine updates for review. Updates are not automatically merged. Actions are pinned by commit SHA. Tests and package startup checks run on Windows, Linux and both Mac architectures before publishing testing releases. The release gate requires every expected package, rejects unexpected/empty packages, verifies tag/version consistency for tag builds, and verifies compatibility aliases match their originals, and generates SHA256SUMS.txt from all validated files.
 
 Repository-level private reporting, secret scanning, push protection and dependency alert settings must be checked separately by a repository administrator. Committing this document or Dependabot configuration does not prove those settings are enabled. Automated checks do not replace hands-on installer, update and migration testing before 1.0.

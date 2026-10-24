@@ -21,6 +21,7 @@ import uuid
 import certifi
 from PySide6.QtCore import QThread, Signal
 from . import __version__
+from .release_assets import ASSETS
 
 RELEASES = 'https://github.com/JPLuker/WriteWatch/releases'
 API = 'https://api.github.com/repos/JPLuker/WriteWatch/releases?per_page=50'
@@ -100,19 +101,21 @@ def select_release(releases, current, suffix, channel='Stable'):
         if release.get('draft') or (channel != 'Testing' and release.get('prerelease')) or not number or number <= version(current):
             continue
         name = f"WriteWatch-{'.'.join(map(str, number))}-{suffix}"
+        canonical = f"WriteWatch-{'.'.join(map(str, number))}-{ASSETS.get(suffix, suffix)}"
         for asset in release.get('assets', []):
-            if asset.get('name') != name or asset.get('state') != 'uploaded':
+            asset_name = asset.get('name')
+            if asset_name not in (name, canonical) or asset.get('state') != 'uploaded':
                 continue
             url = asset.get('browser_download_url', '')
-            expected = f"{RELEASES}/download/{release['tag_name']}/{name}"
+            expected = f"{RELEASES}/download/{release['tag_name']}/{asset_name}"
             if url != expected:
                 continue
             digest = asset.get('digest', '') or ''
             size = asset.get('size', 0)
             if not re.fullmatch(r'sha256:[a-f0-9]{64}', digest) or not isinstance(size, int) or not 0 < size <= MAX_DOWNLOAD:
                 raise ValueError('The release is missing valid download verification metadata.')
-            candidates.append((number, dict(asset, release_version='.'.join(map(str, number)))))
-    return max(candidates, key=lambda item: item[0])[1] if candidates else None
+            candidates.append((number, asset_name == canonical, dict(asset, release_version='.'.join(map(str, number)))))
+    return max(candidates, key=lambda item: (item[0], item[1]))[2] if candidates else None
 
 
 class TrustedRedirect(urllib.request.HTTPRedirectHandler):

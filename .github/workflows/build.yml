@@ -81,4 +81,4 @@ jobs:
             echo "Release v$version already exists; never replace published binaries. Bump the version for a new build."
             exit 1
           fi
-          gh release create "v$version" artifacts/* --target "$GITHUB_SHA" --prerelease --title "WriteWatch v$version — testing build" --notes-file RELEASE_NOTES.md
+          gh release create "v$version" artifacts/* --target "$GITHUB_SHA" --prerelease --title "WriteWatch v$version — testing build" --notes-file release-notes.generated.md

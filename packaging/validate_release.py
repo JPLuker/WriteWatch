@@ -3,13 +3,11 @@ import hashlib
 from pathlib import Path
 import re
 import sys
+import shutil
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from writewatch.release_assets import ASSETS, download_notes
 
-SUFFIXES = (
-    'Windows-portable.zip', 'Windows-Setup.exe',
-    'Linux-x86_64.tar.gz', 'x86_64.AppImage', 'amd64.deb',
-    'macOS-AppleSilicon.dmg', 'macOS-AppleSilicon.zip',
-    'macOS-Intel.dmg', 'macOS-Intel.zip',
-)
+SUFFIXES = tuple(ASSETS)
 
 
 def prepare(folder, version, ref=''):
@@ -19,11 +17,12 @@ def prepare(folder, version, ref=''):
         raise ValueError('Release tag does not match the application version')
     folder = Path(folder)
     expected = {f'WriteWatch-{version}-{suffix}' for suffix in SUFFIXES}
+    aliases = {f'WriteWatch-{version}-{suffix}' for suffix in ASSETS.values()}
     actual = {p.name for p in folder.iterdir() if p.name != 'SHA256SUMS.txt'}
-    if actual != expected:
-        raise ValueError(f'Package set mismatch: missing={sorted(expected-actual)}, unexpected={sorted(actual-expected)}')
-    lines = []
-    for name in sorted(expected):
+    if not expected <= actual or actual - expected - aliases:
+        raise ValueError(f'Package set mismatch: missing={sorted(expected-actual)}, unexpected={sorted(actual-expected-aliases)}')
+    hashes = {}
+    for name in sorted(actual):
         path = folder / name
         if path.is_symlink() or not path.is_file() or path.stat().st_size == 0:
             raise ValueError(f'Package is not a nonempty regular file: {name}')
@@ -31,7 +30,17 @@ def prepare(folder, version, ref=''):
         with path.open('rb') as source:
             for block in iter(lambda: source.read(1024 * 1024), b''):
                 digest.update(block)
-        lines.append(f'{digest.hexdigest()}  {name}\n')
+        hashes[name] = digest.hexdigest()
+    for old, new in ASSETS.items():
+        source, alias = f'WriteWatch-{version}-{old}', f'WriteWatch-{version}-{new}'
+        if alias in hashes and hashes[alias] != hashes[source]:
+            raise ValueError('Compatibility alias differs from original package: ' + alias)
+    for old, new in ASSETS.items():
+        source, alias = f'WriteWatch-{version}-{old}', f'WriteWatch-{version}-{new}'
+        if alias not in hashes:
+            shutil.copyfile(folder / source, folder / alias)
+            hashes[alias] = hashes[source]
+    lines = [f'{digest}  {name}\n' for name, digest in sorted(hashes.items())]
     manifest = folder / 'SHA256SUMS.txt'
     if manifest.is_symlink():
         raise ValueError('Checksum manifest must not be a symlink')
@@ -44,4 +53,6 @@ if __name__ == '__main__':
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
     from writewatch import __version__
     prepare(sys.argv[1], __version__, os.environ.get('GITHUB_REF', ''))
+    root = Path(__file__).resolve().parents[1]
+    (root / 'release-notes.generated.md').write_text(download_notes(__version__, (root / 'RELEASE_NOTES.md').read_text(encoding='utf-8')), encoding='utf-8')
     print('Release package set and checksums: PASS')
