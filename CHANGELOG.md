@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [0.11.1] — 2026-10-24
+### Fixed
+- Block publication of incomplete, empty or mismatched release package sets; generate checksums only after validation.
+### Maintenance
+- Add grouped weekly Dependabot checks for Python dependencies and Actions, plus private vulnerability-reporting guidance.
+
 ## [0.11.0] — 2026-10-18
 ### Added
 - Standard platform storage directories with copy-first migration of history/settings and locks for both old and new profiles.

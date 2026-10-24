@@ -1,11 +1,9 @@
-- Added standard platform data, cache and log locations with automatic copy-first migration from the old default profile. Existing destination history is never overwritten; original data remains for recovery.
-- Added startup/daily cleanup of recognized updater files older than 14 days, pending-update protection, rotated logs and a 10 MB inactive-log retention budget.
-- Kept WRITEWATCH_DATA_DIR profiles in place. Windows portable copies can use an adjacent WriteWatch.portable marker to store an independent profile in data/.
-- Diagnostics show current data/cache/log locations. Clear downloads and Delete all app data include the appropriate new and retained legacy locations.
-- History and JSON backup formats are unchanged from 0.10.0. Older app versions use the original location and do not see new sessions from this version.
+- Added a release gate that requires all nine expected packages, rejects empty or unexpected files, checks tag/version consistency for tag builds, and generates a complete checksum manifest.
+- Added grouped weekly dependency update checks for Python packages and GitHub Actions, plus private vulnerability-reporting guidance.
+- Includes 0.11.0 storage migration and updater retention. Existing default-location history/settings are copied automatically, preserving original files for recovery. Custom profiles stay in place.
 
-Select Settings → Updates → Testing to receive development builds; Stable is the default. DEB updates still require installation through the system package installer.
+No changes to session tracking, history schema or backup format in this maintenance patch. Repository-level security settings still need administrator verification; the new configuration does not establish that they are enabled.
 
-Testing release with automated migration, retention, update and session tests plus package/startup checks on all four platform runners. Hands-on upgrade validation remains outstanding.
+Testing release. Automated tests and packaging checks do not replace hands-on upgrade/migration validation before 1.0. Choose Settings → Updates → Testing to receive development builds.
 
-Requires Windows x64, Linux glibc 2.39+, or macOS 15+. Windows builds are unsigned; Mac builds are not notarized. SHA256SUMS.txt is included.
+Requires Windows x64, Linux glibc 2.39+, or macOS 15+. Windows builds are unsigned; Mac builds are not notarized. DEB installation remains managed by the system package installer. SHA256SUMS.txt is included.

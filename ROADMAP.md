@@ -26,7 +26,7 @@ Desktop priority: finish stabilization and standards work, then release 1.0. Bro
 - Standardize asset names, grouped downloads and SHA256SUMS.txt.
 - Validate 0.10.0 update channels, persistent daily cadence and installation-type policies on actual desktops; automated coverage is in place.
 - Validate 0.11.0 storage migration and retention on actual desktops. Export/import/deletion, data-folder access, diagnostics, migration and automatic updater-file cleanup are implemented.
-- Finish dependency/security baseline configuration and documentation.
+- Verify repository-level private reporting, secret scanning, push protection and dependency alerts with administrator access. Weekly grouped Dependabot checks, SECURITY.md and complete-release validation are implemented in 0.11.1; server-side security settings remain unverified.
 - Confirm each main-release format and its upgrade path on actual hardware or a real VM.
 
 At Joseph’s request, successful versioned main pushes now publish testing prereleases so testing can continue between development sessions. These are not claims of hands-on platform validation. Stable 1.0 publication still requires the checks above.

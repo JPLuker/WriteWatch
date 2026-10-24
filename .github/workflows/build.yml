@@ -76,7 +76,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           version=$(python -c 'from writewatch import __version__; print(__version__)')
-          (cd artifacts && sha256sum * > SHA256SUMS.txt)
+          python packaging/validate_release.py artifacts
           if gh release view "v$version" >/dev/null 2>&1; then
             echo "Release v$version already exists; never replace published binaries. Bump the version for a new build."
             exit 1
