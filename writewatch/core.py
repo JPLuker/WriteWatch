@@ -209,6 +209,13 @@ class Store:
         return [Session(**dict(row)) for row in self.db.execute(
             "SELECT * FROM sessions WHERE status IN ('done','interrupted') ORDER BY started DESC")]
 
+    def delete_session(self, session_id):
+        with self.db:
+            cursor = self.db.execute(
+                "DELETE FROM sessions WHERE id=? AND status IN ('done','interrupted')",
+                (session_id,))
+        return cursor.rowcount == 1
+
     def clear(self):
         with self.db:
             self.db.execute("DELETE FROM sessions WHERE status IN ('done','interrupted')")

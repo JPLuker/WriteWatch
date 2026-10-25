@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [0.14.0] — 2026-10-25
+### Added
+- Delete an individual completed or interrupted session from History, with confirmation identifying the selected session.
+- Refresh weekly totals and streaks after deletion; keep filters and select a nearby remaining session.
+### Changed
+- Label the bulk action Delete all history to distinguish it from deleting one session.
+
 ## [0.13.1] — 2026-10-25
 ### Fixed
 - Update the active goal when switching Writing/Revision, without resetting session progress or pause state.

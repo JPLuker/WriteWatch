@@ -11,7 +11,7 @@ Desktop priority: finish stabilization and standards work, then release 1.0. Bro
 - #7: Default Writing label omitted from text summaries; Revision retained.
 
 ## Next
-- Implement #9: delete an individual history session.
+- Validate #9 implemented in 0.14.0: delete one completed/interrupted history session, with confirmation and refreshed totals.
 - Implement #10: a weekly recap beyond the existing totals line.
 - Validate #8 fixed in 0.13.1: active mode switches apply and restore mode-specific goals without resetting progress.
 - Validate #11 implemented in 0.13.0: History and Settings open as separate windows from the hamburger menu.

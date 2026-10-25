@@ -739,8 +739,12 @@ class Window(QMainWindow):
         row = QHBoxLayout()
         self.review_button = button("Review session", self.share_selected, True)
         row.addWidget(self.review_button)
+        self.delete_session_button = button("Delete session…", self.delete_selected_session)
+        self.delete_session_button.setObjectName("destructive")
+        row.addWidget(self.delete_session_button)
+        self.table.itemSelectionChanged.connect(self.history_selection_changed)
         row.addStretch()
-        delete = button("Delete history…", self.clear_history)
+        delete = button("Delete all history…", self.clear_history)
         delete.setObjectName("destructive")
         row.addWidget(delete)
         layout.addLayout(row)
@@ -1067,6 +1071,37 @@ class Window(QMainWindow):
         self.totals.setText(' · '.join(parts) + f' | {streak}-day streak')
         if self.history:
             self.table.selectRow(0)
+        self.history_selection_changed()
+
+    def history_selection_changed(self):
+        selected = bool(self.table.selectionModel().selectedRows())
+        self.review_button.setEnabled(selected)
+        self.delete_session_button.setEnabled(selected)
+
+    def delete_selected_session(self):
+        selected = self.table.selectionModel().selectedRows()
+        if not selected:
+            return
+        row = selected[0].row()
+        if not 0 <= row < len(self.history):
+            return
+        session = self.history[row]
+        date = datetime.fromisoformat(session.started).astimezone().strftime("%B %d, %Y at %I:%M %p")
+        choice = QMessageBox.question(
+            self.history_dialog, "Delete this session?",
+            f"Delete the {session.mode.lower()} session from {date}? Only this session's statistics will be removed. Your document is kept. This cannot be undone.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No)
+        if choice != QMessageBox.StandardButton.Yes:
+            return
+        try:
+            self.store.delete_session(session.id)
+        except Exception:
+            QMessageBox.warning(self.history_dialog, "Session not deleted", "Could not delete this session. Check available disk space and try again.")
+            return
+        self.refresh_history()
+        if self.history:
+            self.table.selectRow(min(row, len(self.history) - 1))
 
     def share_selected(self, *_):
         row = self.table.currentRow()

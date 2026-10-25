@@ -9,7 +9,7 @@ import unittest
 from unittest.mock import patch
 
 from PySide6.QtCore import QCoreApplication, QEvent, QTimer
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QMessageBox
 from writewatch.core import Session, Store
 from writewatch.app import Window, ShareDialog, card
 from tests.test_core import write_script
@@ -185,6 +185,43 @@ class GoalsHistoryTests(unittest.TestCase):
             self.assertIn('750 words', window.goal_settings_button.text())
             self.assertFalse(window.goal_dialog.isVisible())
             window.close()
+            store.close()
+
+    def test_delete_selected_filtered_session_cancel_failure_and_persistence(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / 'history.sqlite3'
+            store = Store(path)
+            sessions = [Session.new(mode, 0) for mode in ('Writing', 'Revision', 'Writing')]
+            for session, status in zip(sessions, ('done', 'interrupted', 'running')):
+                session.status = status
+                store.save(session)
+            window = Window(store)
+            window.timer.stop()
+            window.history_mode.setCurrentText('Revision')
+            self.assertEqual([s.id for s in window.history], [sessions[1].id])
+            self.assertTrue(window.delete_session_button.isEnabled())
+            with patch.object(QMessageBox, 'question', return_value=QMessageBox.StandardButton.No):
+                window.delete_session_button.click()
+            self.assertEqual(len(store.history()), 2)
+            with patch.object(QMessageBox, 'question', return_value=QMessageBox.StandardButton.Yes), patch.object(store, 'delete_session', side_effect=sqlite3.OperationalError), patch.object(QMessageBox, 'warning') as warning:
+                window.delete_session_button.click()
+                warning.assert_called_once()
+            self.assertEqual(len(store.history()), 2)
+            with patch.object(QMessageBox, 'question', return_value=QMessageBox.StandardButton.Yes):
+                window.delete_session_button.click()
+            self.assertEqual([s.id for s in store.history()], [sessions[0].id])
+            self.assertEqual(window.table.rowCount(), 0)
+            self.assertFalse(window.delete_session_button.isEnabled())
+            self.assertIn('1 sessions', window.totals.text())
+            self.assertFalse(store.delete_session(sessions[2].id))
+            self.assertIsNotNone(store.db.execute('SELECT id FROM sessions WHERE id=?', (sessions[2].id,)).fetchone())
+            window.history_mode.setCurrentText('All sessions')
+            window.table.clearSelection()
+            self.assertFalse(window.delete_session_button.isEnabled())
+            window.close()
+            store.close()
+            store = Store(path)
+            self.assertNotIn(sessions[1].id, [s.id for s in store.history()])
             store.close()
 
     def test_history_filters_and_reopen(self):
