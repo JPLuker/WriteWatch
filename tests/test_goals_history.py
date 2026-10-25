@@ -1,6 +1,7 @@
 import os
 os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
 from datetime import datetime, timedelta
+from contextlib import closing
 from pathlib import Path
 import tempfile
 import sqlite3
@@ -155,7 +156,7 @@ class GoalsHistoryTests(unittest.TestCase):
             window.mode.buttons['Revision'].click()
             self.assertTrue(window.skip_goal.isChecked())
             self.assertEqual(session.goal, 0)
-            with sqlite3.connect(store.path) as db:
+            with closing(sqlite3.connect(store.path)) as db:
                 saved = db.execute('SELECT mode, goal, goal_unit FROM sessions WHERE id = ?', (session.id,)).fetchone()
             self.assertEqual(tuple(saved), ('Revision', 0, 'minutes'))
             window.tracker = None
