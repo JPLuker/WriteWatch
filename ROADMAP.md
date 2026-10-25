@@ -11,6 +11,10 @@ Desktop priority: finish stabilization and standards work, then release 1.0. Bro
 - #7: Default Writing label omitted from text summaries; Revision retained.
 
 ## Next
+- Implement #9: delete an individual history session.
+- Implement #10: a weekly recap beyond the existing totals line.
+- Validate #8 fixed in 0.13.1: active mode switches apply and restore mode-specific goals without resetting progress.
+- Validate #11 implemented in 0.13.0: History and Settings open as separate windows from the hamburger menu.
 - Validate 0.12.0 per-mode metric selections, defaults, copied/image summaries and preference backup/restore. User-requested customization is implemented for the 12 available saved-file metrics; keyboard-event metrics require a separate tracking design and are not promised.
 - Validate the new flow on a real writing session, including negative-count completion.
 - Validate 0.8.0 revision metrics: cumulative word additions/removals between observed saves; no stored content. Movement and punctuation-only changes are intentionally not counted.

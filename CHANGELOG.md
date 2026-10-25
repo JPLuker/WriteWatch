@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [0.13.1] — 2026-10-25
+### Fixed
+- Update the active goal when switching Writing/Revision, without resetting session progress or pause state.
+- Restore each mode's chosen goal when switching back, including skipped goals and page estimates, for the current app run.
+
 ## [0.13.0] — 2026-10-25
 ### Changed
 - Open History and Settings in separate, reusable windows while keeping the session screen in place.

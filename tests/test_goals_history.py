@@ -3,6 +3,7 @@ os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
 from datetime import datetime, timedelta
 from pathlib import Path
 import tempfile
+import sqlite3
 import unittest
 from unittest.mock import patch
 
@@ -115,6 +116,49 @@ class GoalsHistoryTests(unittest.TestCase):
             self.assertEqual(window.goal.suffix(), ' net words')
             window.skip_goal.buttons['No goal'].click()
             self.assertTrue(window.goal_row.isHidden())
+            window.close()
+            store.close()
+
+    def test_live_mode_switch_updates_goal_without_resetting_session(self):
+        with tempfile.TemporaryDirectory() as d:
+            store = Store(Path(d) / 'history.sqlite3')
+            script = Path(d) / 'draft.fadein'
+            write_script(script, 'one two three')
+            window = Window(store)
+            window.timer.stop()
+            window.skip_goal.setChecked(False)
+            window.goal_unit.setCurrentText('Pages')
+            window.page_method.setCurrentText('Estimate')
+            window.page_rate.setValue(300)
+            window.goal.setValue(7)
+            window.path = script
+            window.begin()
+            session = window.tracker.session
+            session.seconds, session.net, session.pages = 600, -5, 2
+            session.status = 'paused'
+            identity = (session.id, session.started)
+            window.mode.buttons['Revision'].click()
+            self.assertEqual((session.mode, session.unit, session.goal), ('Revision', 'minutes', 30))
+            self.assertIn('30 minutes', window.goal_settings_button.toolTip())
+            self.assertAlmostEqual(session.progress, 1 / 3)
+            window.goal.setValue(45)
+            window.apply_goal()
+            window.mode.buttons['Writing'].click()
+            self.assertEqual((session.unit, session.goal, session.words_per_page), ('estimated_pages', 7, 300))
+            window.mode.buttons['Revision'].click()
+            self.assertEqual((session.unit, session.goal), ('minutes', 45))
+            self.assertEqual((session.id, session.started), identity)
+            self.assertEqual((session.seconds, session.net, session.pages, session.status), (600, -5, 2, 'paused'))
+            window.skip_goal.setChecked(True)
+            window.apply_goal()
+            window.mode.buttons['Writing'].click()
+            window.mode.buttons['Revision'].click()
+            self.assertTrue(window.skip_goal.isChecked())
+            self.assertEqual(session.goal, 0)
+            with sqlite3.connect(store.path) as db:
+                saved = db.execute('SELECT mode, goal, goal_unit FROM sessions WHERE id = ?', (session.id,)).fetchone()
+            self.assertEqual(tuple(saved), ('Revision', 0, 'minutes'))
+            window.tracker = None
             window.close()
             store.close()
 

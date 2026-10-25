@@ -545,6 +545,8 @@ class Window(QMainWindow):
         self.file_status.setWordWrap(True)
         row.addWidget(self.file_status, 1)
         setup.addLayout(row)
+        self.goal_mode = "Writing"
+        self.mode_goals = {}
         self.mode = SegmentedChoice(["Writing", "Revision"])
         self.mode.setAccessibleName("Session type")
         self.mode.currentTextChanged.connect(self.mode_changed)
@@ -801,11 +803,22 @@ class Window(QMainWindow):
         self.add_scroll_tab(page, "Privacy")
 
     def mode_changed(self, mode):
+        # Keep each mode's choices when switching, including during tracking.
+        self.mode_goals[self.goal_mode] = (
+            self.skip_goal.isChecked(), self.goal_unit.currentText(), self.goal.value(),
+            self.page_method.currentText(), self.page_rate.value())
+        skipped, unit, target, method, rate = self.mode_goals.get(mode, (
+            self.skip_goal.isChecked(), "Minutes" if mode == "Revision" else "Words",
+            30 if mode == "Revision" else 500, "Enter pages", 250))
+        self.goal_mode = mode
+        self.skip_goal.setChecked(skipped)
+        self.goal_unit.setCurrentText(unit)
+        self.goal.setValue(target)
+        self.page_method.setCurrentText(method)
+        self.page_rate.setValue(rate)
         if self.tracker:
             self.tracker.session.mode = mode
-            self.persist()
-        else:
-            self.goal_unit.setCurrentText("Minutes" if mode == "Revision" else "Words")
+            self.apply_goal()
         self.update_view()
 
     def clear_recents(self):
