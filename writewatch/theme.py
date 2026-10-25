@@ -83,6 +83,12 @@ QToolButton {{ background: {t['surface']}; border: 2px solid transparent; border
 QToolButton:hover {{ background: {t['surface2']}; }}
 QToolButton:focus {{ border-color: {t['accent']}; }}
 QToolButton:checked {{ background: {t['surface2']}; }}
+QToolButton#navigationButton {{ padding: 4px; border-radius: 14px; }}
+QToolButton#navigationButton::menu-indicator {{ image: none; width: 0; }}
+QToolButton#navigationButton:pressed {{ background: {t['surface3']}; }}
+QMenu#navigationMenu {{ padding: 8px; border: 1px solid {t['tertiary']}; border-radius: 14px; }}
+QMenu#navigationMenu::item {{ padding: 12px 24px 12px 12px; border-radius: 6px; }}
+QMenu#navigationMenu::item:selected {{ background: {t['soft']}; color: {t['text']}; }}
 QToolTip {{ background: {t['surface']}; color: {t['text']}; border: 1px solid {t['tertiary']}; padding: 8px; }}
 QScrollArea {{ border: 0; }}
 QScrollBar:vertical {{ background: {t['surface2']}; width: 12px; border-radius: 6px; }}

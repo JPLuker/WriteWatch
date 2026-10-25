@@ -85,10 +85,7 @@ class UpdatesPanel(QWidget):
         self.restart.style().polish(self.restart)
         self.check.setEnabled(bool(self.installation))
         self.releases_button.setText('View releases')
-        self.window.menu_button.setText('')
-        self.window.menu_button.setToolTip('Menu')
-        self.window.menu_button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly)
-        self.window.tabs.setTabText(self.window.tabs.indexOf(getattr(self.window, 'settings_tab', self)), 'Settings')
+        self.window.set_update_notice()
         self.status.setText(f'{channel} channel selected. Check for updates when ready.')
 
     def preference_changed(self, enabled):
@@ -158,9 +155,7 @@ class UpdatesPanel(QWidget):
     def update_available(self, asset):
         self.status.setText(f"Version {asset['release_version']} is available. Open releases, download the matching package and install it manually. Your history is kept.")
         self.releases_button.setText('Download update from releases')
-        self.window.menu_button.setToolTip('Menu — update available')
-        self.window.menu_button.setText('Update available')
-        self.window.menu_button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+        self.window.set_update_notice('Update available')
 
     def downloaded(self, path, asset):
         self.pending = (path, asset)
@@ -169,10 +164,7 @@ class UpdatesPanel(QWidget):
         self.restart.style().unpolish(self.restart)
         self.restart.style().polish(self.restart)
         self.restart.setEnabled(True)
-        self.window.menu_button.setToolTip("Menu — update ready")
-        self.window.menu_button.setText("Update ready")
-        self.window.menu_button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
-        self.window.tabs.setTabText(self.window.tabs.indexOf(getattr(self.window, 'settings_tab', self)), 'Update ready')
+        self.window.set_update_notice('Update ready')
 
     def apply(self):
         if not self.pending:
@@ -193,6 +185,6 @@ class UpdatesPanel(QWidget):
         if self.worker and self.worker.isRunning():
             self.worker.cancel.set()
             self.status.setText('Stopping download. Close again in a moment.')
-            self.window.tabs.setCurrentWidget(getattr(self.window, 'settings_tab', self))
+            self.window.show_settings()
             return False
         return True

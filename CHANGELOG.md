@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [0.13.0] — 2026-10-25
+### Changed
+- Open History and Settings in separate, reusable windows while keeping the session screen in place.
+- Simplify the hamburger menu to History and Settings, with larger rows and a consistent icon button.
+- Put update notices on the Settings menu item without widening the hamburger button.
+- Support the system Settings keyboard shortcut and Escape to close History or Settings.
+
 ## [0.12.0] — 2026-10-24
 ### Added
 - Twelve configurable saved-file session metrics with separate Writing/Revision selections and reset-to-default controls.

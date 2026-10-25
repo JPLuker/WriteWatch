@@ -5,8 +5,8 @@ from pathlib import Path
 import sys
 import os
 
-from PySide6.QtCore import Qt, QTimer, QStandardPaths, QLockFile, QSettings, QUrl
-from PySide6.QtGui import QColor, QFont, QPainter, QPixmap, QIcon, QDesktopServices
+from PySide6.QtCore import Qt, QTimer, QStandardPaths, QLockFile, QSettings, QUrl, QSize
+from PySide6.QtGui import QColor, QFont, QPainter, QPixmap, QIcon, QDesktopServices, QKeySequence
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QPushButton, QFileDialog, QComboBox, QSpinBox, QFrame, QProgressBar,
@@ -162,11 +162,17 @@ class Window(QMainWindow):
         top.addWidget(label("WriteWatch", "brand"))
         top.addStretch()
         self.menu_button = QToolButton()
+        self.menu_button.setObjectName("navigationButton")
+        self.menu_button.setMinimumSize(44, 44)
+        self.menu_button.setIconSize(QSize(24, 24))
+        self.menu_button.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.menu_button.setIcon(nav_icon(5))
         self.menu_button.setAccessibleName("Navigation menu")
         self.menu_button.setToolTip("Menu")
         self.menu_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
         self.navigation = QMenu(self.menu_button)
+        self.navigation.setObjectName("navigationMenu")
+        self.navigation.setMinimumWidth(220)
         self.menu_button.setMenu(self.navigation)
         top.addWidget(self.menu_button)
         layout.addLayout(top)
@@ -181,16 +187,52 @@ class Window(QMainWindow):
         self.tabs.removeTab(3)
         self.tabs.removeTab(2)
         self.build_settings(update_folder)
-        for index, title in enumerate(("Session", "History", "Settings")):
-            action = self.navigation.addAction(title)
-            action.triggered.connect(lambda checked=False, i=index: self.tabs.setCurrentIndex(i))
-        for index in range(self.tabs.count()):
-            self.tabs.setTabIcon(index, nav_icon(index))
+        self.history_dialog = self.make_page_dialog(self.tabs.widget(1), "History", 860, 640)
+        self.settings_dialog = self.make_page_dialog(self.settings_tab, "Settings", 720, 640)
+        self.history_action = self.navigation.addAction(nav_icon(1), "History", self.show_history)
+        self.settings_action = self.navigation.addAction(nav_icon(4), "Settings", self.show_settings)
+        self.settings_action.setShortcut(QKeySequence.StandardKey.Preferences)
+        self.addAction(self.settings_action)
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.poll)
         self.timer.start(2000)
         self.refresh_history()
         self.update_view()
+
+    def make_page_dialog(self, page, title, width, height):
+        self.tabs.removeTab(self.tabs.indexOf(page))
+        dialog = QDialog(self)
+        dialog.setWindowTitle(f"{title} · WriteWatch")
+        dialog.resize(width, height)
+        dialog.setMinimumSize(480, 360)
+        layout = QVBoxLayout(dialog)
+        layout.setContentsMargins(24, 24, 24, 24)
+        layout.setSpacing(16)
+        layout.addWidget(label(title, "section"))
+        layout.addWidget(page)
+        page.show()
+        close = button("Close", dialog.close)
+        close.setAutoDefault(False)
+        layout.addWidget(close, alignment=Qt.AlignmentFlag.AlignRight)
+        dialog.finished.connect(lambda _: self.menu_button.setFocus())
+        return dialog
+
+    def show_history(self):
+        self.refresh_history()
+        self.show_page_dialog(self.history_dialog)
+
+    def show_settings(self):
+        self.show_page_dialog(self.settings_dialog)
+
+    def show_page_dialog(self, dialog):
+        dialog.showNormal() if dialog.isMinimized() else dialog.show()
+        dialog.raise_()
+        dialog.activateWindow()
+
+    def set_update_notice(self, text=""):
+        self.settings_action.setText(f"Settings — {text}" if text else "Settings")
+        self.menu_button.setToolTip(f"Menu — {text.lower()}" if text else "Menu")
+        self.menu_button.setAccessibleName(f"Navigation menu, {text.lower()}" if text else "Navigation menu")
 
     def add_scroll_tab(self, page, title):
         scroll = QScrollArea()
@@ -413,10 +455,7 @@ class Window(QMainWindow):
             self.updates.restart.style().polish(self.updates.restart)
             self.updates.check.setEnabled(bool(self.updates.installation))
             self.updates.status.setText("Update downloads and logs cleared.")
-            self.tabs.setTabText(self.tabs.indexOf(self.settings_tab), "Settings")
-            self.menu_button.setText("")
-            self.menu_button.setToolTip("Menu")
-            self.menu_button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly)
+            self.set_update_notice()
         QMessageBox.information(self, "Downloads cleared", "Update downloads and logs were removed. Your history and settings were kept.")
 
     def copy_diagnostics(self):
@@ -482,8 +521,9 @@ class Window(QMainWindow):
         apply_theme(choice, ambient)
         self.centralWidget().update()
         self.menu_button.setIcon(nav_icon(5))
-        for index in range(self.tabs.count()):
-            self.tabs.setTabIcon(index, nav_icon(index))
+        if hasattr(self, "history_action"):
+            self.history_action.setIcon(nav_icon(1))
+            self.settings_action.setIcon(nav_icon(4))
 
     def build_session(self):
         page = QWidget()

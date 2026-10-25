@@ -220,7 +220,8 @@ class UpdateUiTests(unittest.TestCase):
             panel.update_available({'release_version': '0.9.0'})
             self.assertIn('0.9.0', panel.status.text())
             self.assertIsNone(panel.pending)
-            self.assertEqual(window.menu_button.text(), 'Update available')
+            self.assertEqual(window.menu_button.text(), '')
+            self.assertEqual(window.settings_action.text(), 'Settings — Update available')
             with patch('writewatch.update_ui.QDesktopServices.openUrl', return_value=True) as opened:
                 panel.releases_button.click()
                 self.assertEqual(opened.call_args.args[0].toString(), 'https://github.com/JPLuker/WriteWatch/releases')

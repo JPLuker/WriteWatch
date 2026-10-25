@@ -191,7 +191,7 @@ class DataUiTests(unittest.TestCase):
         self.assertTrue(panel.check.isEnabled())
         self.assertFalse(panel.folder.exists())
         self.assertTrue(self.store.path.exists())
-        self.assertEqual(self.window.tabs.tabText(self.window.tabs.indexOf(self.window.settings_tab)), 'Settings')
+        self.assertEqual(self.window.settings_action.text(), 'Settings')
 
     def test_delete_cancel_preserves_data_then_confirm_quits(self):
         from writewatch.storage import Storage
