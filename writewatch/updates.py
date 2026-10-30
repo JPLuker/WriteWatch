@@ -18,6 +18,8 @@ import urllib.request
 from urllib.parse import urlsplit
 import uuid
 
+from .protection import safe_directory, regular_unlinked, write_new
+
 import certifi
 from PySide6.QtCore import QThread, Signal
 from . import __version__
@@ -164,6 +166,7 @@ class UpdateWorker(QThread):
 
     def run(self):
         partial = None
+        partial_created = False
         try:
             if updates_disabled():
                 self.status.emit('Updates are disabled by policy.')
@@ -184,10 +187,19 @@ class UpdateWorker(QThread):
                 self.available.emit(asset)
                 return
             self.folder.mkdir(parents=True, exist_ok=True)
+            if not safe_directory(self.folder):
+                raise ValueError('Update storage must not be a linked folder')
             destination = self.folder / asset['name']
-            partial = destination.with_suffix(destination.suffix + '.part')
+            if os.path.lexists(destination):
+                if not regular_unlinked(destination):
+                    raise ValueError('Update destination is a link or folder')
+                verify(destination, asset)
+                self.ready.emit(destination, asset)
+                return
+            partial = self.folder / ('download-' + uuid.uuid4().hex + '.part')
             count = 0
-            with client.open(request(asset['browser_download_url']), timeout=15) as response, partial.open('wb') as output:
+            with client.open(request(asset['browser_download_url']), timeout=15) as response, partial.open('xb') as output:
+                partial_created = True
                 while not self.cancel.is_set():
                     block = response.read(1024 * 1024)
                     if not block:
@@ -200,13 +212,16 @@ class UpdateWorker(QThread):
             if self.cancel.is_set():
                 return
             verify(partial, asset)
-            partial.replace(destination)
+            # Atomic, no-clobber publication. A collision never replaces a file.
+            os.link(partial, destination)
+            partial.unlink()
+            partial_created = False
             self.ready.emit(destination, asset)
         except Exception as error:
             if not self.cancel.is_set():
                 self.failed.emit(f'Update unavailable: {error}. You can try again later.')
         finally:
-            if partial:
+            if partial_created:
                 try:
                     partial.unlink(missing_ok=True)
                 except OSError:
@@ -257,13 +272,14 @@ while kill -0 {pid} 2>/dev/null; do
 done
 """
     if install.kind == 'appimage':
-        script += f'cp {q(payload)} {q(stage)}\nchmod +x {q(stage)}\n'
+        script += f'(set -C; cat {q(payload)} > {q(stage)})\nchmod +x {q(stage)}\n'
         launch = f'{q(target)} >/dev/null 2>&1 &'
     else:
         extract = payload.parent / ('extract-' + token)
         script += f'/usr/bin/ditto -x -k {q(payload)} {q(extract)}\n/usr/bin/codesign --verify --deep --strict {q(extract / "WriteWatch.app")}\n/usr/bin/ditto {q(extract / "WriteWatch.app")} {q(stage)}\n'
         launch = f'/usr/bin/open {q(target)}'
-    script += f"""mv {q(target)} {q(backup)}
+    script += f"""[ ! -e {q(backup)} ] && [ ! -L {q(backup)} ] || exit 1
+mv {q(target)} {q(backup)}
 if ! mv {q(stage)} {q(target)}; then
   mv {q(backup)} {q(target)}
   exit 1
@@ -278,13 +294,17 @@ def install_update(install, payload, asset, log_folder=None):
         raise ValueError('Updates are disabled by policy.')
     if not can_install(install):
         raise ValueError('Install this update manually; DEB updates use your system package installer.')
+    if not safe_directory(payload.parent) or not regular_unlinked(payload):
+        raise ValueError('Update package must not be a linked file.')
+    if not safe_directory(install.target.parent) or install.target.is_symlink() or install.target.is_junction():
+        raise ValueError('Update installation must not be a linked path.')
     verify(payload, asset)  # Verify again immediately before executing.
     if not os.access(install.target.parent, os.W_OK):
         raise ValueError('This installation folder is not writable. Move WriteWatch to a writable folder or install manually.')
     token = uuid.uuid4().hex[:12]
     windows = install.kind.startswith('windows')
     helper = payload.parent / ('apply-' + token + ('.ps1' if windows else '.sh'))
-    helper.write_text(helper_script(install, payload, os.getpid(), token), encoding='utf-8-sig' if windows else 'utf-8')
+    write_new(helper, helper_script(install, payload, os.getpid(), token).encode('utf-8-sig' if windows else 'utf-8'))
     env = os.environ.copy()
     for key in ('LD_LIBRARY_PATH', 'DYLD_LIBRARY_PATH'):
         if key + '_ORIG' in env:
@@ -304,9 +324,9 @@ def install_update(install, payload, asset, log_folder=None):
         command, options = ['/bin/sh', str(helper)], {'start_new_session': True}
     logs = Path(log_folder) if log_folder is not None else payload.parent
     logs.mkdir(parents=True, exist_ok=True)
-    previous = logs / 'last-update.log'
-    if previous.exists():
-        previous.replace(logs / ('last-update-' + token + '.log'))
-    with previous.open('wb') as log:
+    if not safe_directory(logs):
+        raise ValueError('Update logs must not use a linked folder.')
+    previous = logs / ('last-update-' + token + '.log')
+    with previous.open('xb') as log:
         subprocess.Popen(command, stdin=subprocess.DEVNULL, stdout=log, stderr=log,
                          cwd=str(payload.parent), env=env, **options)

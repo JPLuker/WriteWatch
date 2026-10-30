@@ -5,7 +5,7 @@ from pathlib import Path
 import sys
 import os
 
-from PySide6.QtCore import Qt, QTimer, QStandardPaths, QLockFile, QSettings, QUrl, QSize
+from PySide6.QtCore import Qt, QTimer, QStandardPaths, QLockFile, QSettings, QUrl, QSize, QBuffer, QIODevice
 from PySide6.QtGui import QColor, QFont, QPainter, QPixmap, QIcon, QDesktopServices, QKeySequence
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel,
@@ -134,14 +134,30 @@ class ShareDialog(QDialog):
         if path:
             if not path.lower().endswith(".png"):
                 path += ".png"
-            if not card(session, self.enabled).save(path, "PNG"):
+            from .protection import write_new
+            buffer = QBuffer()
+            buffer.open(QIODevice.OpenModeFlag.WriteOnly)
+            try:
+                if not card(session, self.enabled).save(buffer, "PNG"):
+                    raise OSError('Image encoding failed')
+                write_new(path, bytes(buffer.data()))
+            except FileExistsError:
+                QMessageBox.warning(self, "Choose a new filename", "That file already exists. Choose a new filename; WriteWatch will not overwrite it.")
+            except OSError:
                 QMessageBox.warning(self, "Image not saved", "Choose a writable folder and try again.")
+            finally:
+                buffer.close()
+
 
 
 class Window(QMainWindow):
     def __init__(self, store, update_folder=None, storage=None):
         super().__init__()
         self.store = store
+        from .protection import writable_app_file
+        for name in ('appearance.ini', 'updates.ini', 'recents.ini', 'metrics.ini'):
+            writable_app_file(store.path.parent / name)
+        self.watched_paths = set()
         from .storage import Storage
         self.storage = storage or Storage.local(store.path.parent)
         self.metric_settings = QSettings(str(store.path.parent / "metrics.ini"), QSettings.Format.IniFormat)
@@ -352,6 +368,13 @@ class Window(QMainWindow):
             self.refresh_history()
 
     def data_ready(self):
+        from .protection import writable_app_file
+        try:
+            for name in ('appearance.ini', 'updates.ini', 'recents.ini', 'metrics.ini', 'history.sqlite3'):
+                writable_app_file(self.store.path.parent / name)
+        except ValueError as error:
+            QMessageBox.warning(self, "Storage protection", str(error))
+            return False
         if self.tracker:
             QMessageBox.information(self, "Finish your session first", "Finish your session before managing app data.")
             return False
@@ -379,6 +402,9 @@ class Window(QMainWindow):
             path += '.json'
         try:
             write_backup(path, backup_payload(self.store, self.export_preferences()))
+        except FileExistsError:
+            QMessageBox.warning(self, "Choose a new filename", "That file already exists. Choose a new filename; WriteWatch will not overwrite it.")
+            return
         except (OSError, ValueError, TypeError):
             QMessageBox.warning(self, "Export failed", "Could not save the backup. Check the destination and free space.")
             return
@@ -437,13 +463,14 @@ class Window(QMainWindow):
         if not self.data_ready():
             return
         from .data import clear_cache
+        from .storage import clear_artifacts
+        protected = self.protected_documents()
         try:
-            clear_cache(self.store.path.parent)
-            from .data import remove_owned
-            remove_owned(self.storage.cache)
-            remove_owned(self.storage.logs)
+            clear_cache(self.store.path.parent, protected)
+            clear_artifacts(self.storage.cache, protected=protected)
+            clear_artifacts(self.storage.logs, logs=True, protected=protected)
             if self.storage.legacy:
-                clear_cache(self.storage.legacy)
+                clear_cache(self.storage.legacy, protected)
         except OSError:
             QMessageBox.warning(self, "Could not clear downloads", "Some update files could not be removed. Check folder permissions.")
             return
@@ -456,13 +483,19 @@ class Window(QMainWindow):
             self.updates.check.setEnabled(bool(self.updates.installation))
             self.updates.status.setText("Update downloads and logs cleared.")
             self.set_update_notice()
-        QMessageBox.information(self, "Downloads cleared", "Update downloads and logs were removed. Your history and settings were kept.")
+        QMessageBox.information(self, "Downloads cleared", "Recognized update files were cleared. Documents, links and subfolders were kept.")
+
+    def protected_documents(self):
+        paths = self.watched_paths | {Path(p) for p in self.recent_files()}
+        if self.path:
+            paths.add(self.path)
+        return paths
 
     def copy_diagnostics(self):
         import platform
         text = (f"WriteWatch {__version__}\nOS: {platform.system()} {platform.release()}\n"
                 f"Architecture: {platform.machine()}\nHistory schema: 2\n"
-                f"Data folder: {self.store.path.parent}\nCache folder: {self.storage.cache}\nUpdate log: {self.storage.logs / 'last-update.log'}")
+                f"Data folder: {self.store.path.parent}\nCache folder: {self.storage.cache}\nUpdate logs: {self.storage.logs}")
         QApplication.clipboard().setText(text)
 
     def delete_all_data(self):
@@ -476,18 +509,20 @@ class Window(QMainWindow):
         if self.updates:
             self.updates.timer.stop()
             self.updates.automatic.setChecked(False)
+        protected = self.protected_documents()
+        # Flush pending settings before unlinking. Do not clear through a file
+        # that may have been redirected since startup.
         for item in (self.preferences, self.recent_settings, self.metric_settings, self.updates.settings if self.updates else None):
             if item is not None:
-                item.clear()
                 item.sync()
         self.store.close()
         try:
             if self.storage.legacy:
-                delete_owned_data(self.storage.legacy)
-            delete_owned_data(self.store.path.parent)
-            from .data import remove_owned
-            remove_owned(self.storage.cache)
-            remove_owned(self.storage.logs)
+                delete_owned_data(self.storage.legacy, protected)
+            delete_owned_data(self.store.path.parent, protected)
+            from .storage import clear_artifacts
+            clear_artifacts(self.storage.cache, protected=protected)
+            clear_artifacts(self.storage.logs, logs=True, protected=protected)
         except OSError:
             QMessageBox.warning(self, "Some app data remains", "Some files could not be deleted. WriteWatch will quit. Remove remaining app files from the data folder manually.")
         self.close()
@@ -844,6 +879,7 @@ class Window(QMainWindow):
         if self.tracker:
             return
         self.path = Path(path)
+        self.watched_paths.add(self.path)
         self.begin()
         if self.tracker:
             self.file_status.setText(format_name(self.path) + " selected")
@@ -1154,6 +1190,8 @@ def main():
         if storage.legacy and storage.legacy.is_dir():
             lock_folders.append(storage.legacy)
         for lock_folder in lock_folders:
+            from .protection import writable_app_file
+            writable_app_file(lock_folder / "writewatch.lock")
             lock = QLockFile(str(lock_folder / "writewatch.lock"))
             lock.setStaleLockTime(0)
             if not lock.tryLock(0):
@@ -1168,15 +1206,20 @@ def main():
     except Exception:
         QMessageBox.critical(None, "History unavailable", "WriteWatch could not open local history. Check disk space and folder permissions.")
         return 1
-    cleanup(storage)
-    window = Window(store, update_folder=folder, storage=storage)
+    try:
+        window = Window(store, update_folder=folder, storage=storage)
+    except ValueError as error:
+        store.close()
+        QMessageBox.critical(None, "Storage protection", str(error))
+        return 1
+    cleanup(storage, protected=window.protected_documents())
     retention = QTimer(window)
     def maintain_storage():
         panel = window.updates
         if panel and panel.worker and panel.worker.isRunning():
             return
         protected = [panel.pending[0]] if panel and panel.pending else []
-        cleanup(storage, protected=protected)
+        cleanup(storage, protected=[*protected, *window.protected_documents()])
     retention.timeout.connect(maintain_storage)
     retention.start(24 * 60 * 60 * 1000)
     window.show()

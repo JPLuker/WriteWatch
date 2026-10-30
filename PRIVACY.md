@@ -50,3 +50,13 @@ Packaged installations can check GitHub's public WriteWatch releases at most dai
 Windows installers and AppImages download compatible updates. DEB, Linux tar, portable Windows and current macOS builds only check and notify; installation remains manual. Source builds do not check automatically. Disable automatic checks in Settings → Updates to stop automatic requests; manual checks still work. `WRITEWATCH_DISABLE_UPDATES=1` or the documented Windows policy disables updater requests and installation entirely.
 
 Requests contain the app version in the user agent. GitHub and its download infrastructure receive normal connection metadata, including your IP address, and the requested platform-specific asset. No document text, filenames, document paths, goals or session statistics are sent. There is no account, token, analytics or tracking identifier. Preferences and downloaded update packages are stored locally separately from history. Downloads are checked using GitHub's published size and SHA-256 checksum. This verifies integrity against release metadata; it is not an independent publisher signature.
+
+## Document protection
+
+Document adapters only read saved files. WriteWatch does not send editor commands or save text back into a document. It does not create manuscript backups.
+
+Cleanup is nonrecursive. It removes only recognized app data/update filenames, skips linked and hard-linked files, and protects current/recent/in-process watched paths. Documents, unknown files and nested folders in cache/log directories are retained. Linked storage roots are refused or skipped; cleanup may leave files for manual review.
+
+JSON exports and PNG share images require a new filename. Existing destinations, including links, are refused even if replacement was confirmed in the OS file picker. Migration backups are uniquely named. App data files redirected through links are refused at startup.
+
+These safeguards reduce concrete data-loss risks; they are not a guarantee against hardware failure, operating-system faults, malicious concurrent filesystem changes, or bugs elsewhere. Keep your editor's document backups/version history enabled.

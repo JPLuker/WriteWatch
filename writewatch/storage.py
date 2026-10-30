@@ -10,6 +10,8 @@ import sys
 import tempfile
 import time
 
+from .protection import safe_directory, regular_unlinked, matches, remove_file
+
 APP_ID = 'io.github.jpluker.writewatch'
 RETENTION = 14 * 86400
 LOG_LIMIT = 10 * 1024 * 1024
@@ -63,23 +65,25 @@ def migrate(storage):
     """
     old = storage.legacy
     target = storage.data
-    if old is None or not old.is_dir() or (target / 'history.sqlite3').exists():
+    if old is None or not safe_directory(old) or (target / 'history.sqlite3').exists():
         return False
     target.mkdir(parents=True, exist_ok=True)
+    if not safe_directory(target):
+        raise ValueError('App storage must not be a linked folder.')
     sources = [old / n for n in ('appearance.ini', 'updates.ini', 'recents.ini', 'metrics.ini')]
-    sources += [p for p in old.glob('history.sqlite3.backup-v*') if re.fullmatch(r'history\.sqlite3\.backup-v\d+', p.name)]
+    sources += [p for p in old.glob('history.sqlite3.backup-v*') if re.fullmatch(r'history\.sqlite3\.backup-v\d+(?:-[a-f0-9]+)?', p.name)]
     for source in sources:
         dest = target / source.name
-        if source.is_file() and not source.is_symlink() and not dest.exists():
+        if regular_unlinked(source) and not os.path.lexists(dest):
             fd, name = tempfile.mkstemp(prefix='.migration-', dir=target)
             os.close(fd)
             try:
                 shutil.copyfile(source, name)
-                os.replace(name, dest)
+                os.link(name, dest)
             finally:
                 Path(name).unlink(missing_ok=True)
     source = old / 'history.sqlite3'
-    if not source.is_file() or source.is_symlink():
+    if not regular_unlinked(source):
         return False
     fd, name = tempfile.mkstemp(prefix='.migration-', dir=target)
     os.close(fd)
@@ -89,50 +93,66 @@ def migrate(storage):
                 original.backup(copy)
                 if copy.execute('PRAGMA quick_check').fetchone()[0] != 'ok':
                     raise ValueError('History integrity check failed.')
-        os.replace(name, target / 'history.sqlite3')
+        os.link(name, target / 'history.sqlite3')
     finally:
         Path(name).unlink(missing_ok=True)
     return True
 
 
+def owned_artifact(path, logs=False):
+    log = bool(re.fullmatch(r'last-update(?:-[A-Za-z0-9_-]+)?\.log', path.name))
+    cache = bool(re.fullmatch(
+        r'(?:WriteWatch-\d+\.\d+\.\d+-[A-Za-z0-9_-]+\.(?:exe|AppImage|zip|deb|tar\.gz)(?:\.part)?|apply-[a-f0-9]+\.(?:sh|ps1)|download-[a-f0-9]+\.part)', path.name))
+    return log or (not logs and cache)
+
+
+def clear_artifacts(folder, logs=False, protected=()):
+    folder = Path(folder)
+    if not safe_directory(folder):
+        return
+    for path in folder.iterdir():
+        if owned_artifact(path, logs):
+            remove_file(path, protected)
+    # Only an empty directory may be removed. User-created contents stay put.
+    try:
+        folder.rmdir()
+    except OSError:
+        pass
+
+
 def cleanup(storage, now=None, protected=()):
-    """Only updater-owned files; never follow symlinks or traverse documents."""
+    """Nonrecursive age/budget cleanup with the same protections as manual clear."""
     now = time.time() if now is None else now
-    protected = {Path(p) for p in protected}
     folders = [(storage.cache, False), (storage.logs, True)]
     if storage.legacy:
         folders.append((storage.legacy / 'updates', False))
     remaining = []
     for folder, logs in folders:
-        if folder.is_symlink() or not folder.is_dir():
+        if not safe_directory(folder):
             continue
         try:
             entries = list(folder.iterdir())
         except OSError:
             continue
         for path in entries:
-            if path.is_symlink() or not path.is_file() or path in protected:
-                continue
-            owned_log = bool(re.fullmatch(r'last-update(?:-[A-Za-z0-9_-]+)?\.log', path.name))
-            owned_cache = (path.name.startswith('WriteWatch-') and path.name.endswith(('.exe', '.AppImage', '.zip', '.deb', '.tar.gz', '.part'))) or bool(re.fullmatch(r'apply-[a-f0-9]+\.(sh|ps1)', path.name))
-            if not owned_log and (logs or not owned_cache):
-                continue
             try:
-                stat = path.stat()
-                if now - stat.st_mtime > RETENTION:
-                    path.unlink()
-                elif owned_log:
-                    remaining.append((stat.st_mtime, stat.st_size, path))
+                if not regular_unlinked(path) or matches(path, protected) or not owned_artifact(path, logs):
+                    continue
+                info = path.stat()
+                if now - info.st_mtime > RETENTION:
+                    remove_file(path, protected)
+                elif path.suffix == '.log':
+                    remaining.append((info.st_mtime, info.st_size, path))
             except OSError:
-                continue  # Cleanup never prevents writing sessions.
+                continue
     total = sum(size for _, size, _ in remaining)
     for modified, size, path in sorted(remaining):
         if total <= LOG_LIMIT:
             break
         if now - modified < 60:
-            continue  # An updater helper may still hold a fresh log open.
+            continue
         try:
-            path.unlink()
-            total -= size
+            if remove_file(path, protected):
+                total -= size
         except OSError:
             pass

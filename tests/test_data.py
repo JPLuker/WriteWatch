@@ -88,9 +88,8 @@ class DataTests(unittest.TestCase):
     def test_failed_export_preserves_existing_backup(self):
         path = self.folder / 'export.json'
         path.write_text('old backup')
-        with patch('writewatch.data.os.replace', side_effect=OSError('full disk')):
-            with self.assertRaises(OSError):
-                write_backup(path, self.payload)
+        with self.assertRaises(FileExistsError):
+            write_backup(path, self.payload)
         self.assertEqual(path.read_text(), 'old backup')
         self.assertFalse(list(self.folder.glob('.writewatch-export-*')))
 
@@ -123,7 +122,7 @@ class DataTests(unittest.TestCase):
             self.skipTest('Creating symlinks requires privileges on this host')
         clear_cache(self.folder)
         self.assertEqual((target / 'script.txt').read_text(), 'secret')
-        self.assertFalse((self.folder / 'updates').is_symlink())
+        self.assertTrue((self.folder / 'updates').is_symlink())
 
 
 class DataUiTests(unittest.TestCase):
@@ -181,7 +180,7 @@ class DataUiTests(unittest.TestCase):
         panel.timer.stop()
         panel.automatic.setChecked(False)
         panel.folder.mkdir()
-        download = panel.folder / 'update.AppImage'
+        download = panel.folder / 'WriteWatch-9.0.0-Linux-x64.AppImage'
         download.write_text('download')
         panel.downloaded(download, {'release_version': '9.0.0'})
         with patch.object(QMessageBox, 'information'):

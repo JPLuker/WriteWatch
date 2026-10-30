@@ -210,3 +210,7 @@ Selections apply to the live session, individual history reviews, copied summari
 Toggles control display and sharing, not collection: local aggregate session statistics continue to be recorded so metrics can be re-enabled later. There is still no keystroke logging or stored script content. Pace divides saved word changes by the manual session clock; it is **not typing speed or active typing time**. Observed changes are saves/polls where word occurrences changed, **not every editor save**. Ratios with zero denominators and unavailable historical revision measurements are omitted. Word movement, punctuation-only edits and changes undone between observations are not captured.
 
 Metric selections are stored in `metrics.ini` and included in JSON backup format 3. Versions 1/2 still import with default metric selections; older apps cannot import version 3 exports. Import replaces metric preferences after confirmation. History database schema remains version 2. Full app-data deletion removes metric preferences too.
+
+### Document protection
+
+WriteWatch reads your document without writing changes back. Cache clearing and app-data deletion preserve documents and nested folders; linked storage paths are refused or skipped. Backup exports and share images require a new filename and cannot overwrite existing files. Cleanup removes recognized app-owned filenames only, so unknown files may remain for manual review. These checks do not replace your editor's backups or filesystem version history.

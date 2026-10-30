@@ -168,6 +168,18 @@ class Store:
     def __init__(self, path: Path):
         path.parent.mkdir(parents=True, exist_ok=True)
         self.path = path
+        from .protection import writable_app_file
+        writable_app_file(path)
+        for suffix in ('-wal', '-shm', '-journal'):
+            writable_app_file(Path(str(path) + suffix))
+        # Do not add WriteWatch tables to an unrelated existing database.
+        if path.exists() and path.stat().st_size:
+            with closing(sqlite3.connect(path.resolve().as_uri() + '?mode=ro', uri=True)) as original:
+                if original.execute('PRAGMA user_version').fetchone()[0] > 2:
+                    raise ValueError('This data was saved by a newer version. Update WriteWatch to open it.')
+                columns = {r[1] for r in original.execute('PRAGMA table_info(sessions)')}
+                if not {'id', 'started', 'mode', 'goal', 'seconds', 'net', 'saves', 'status'} <= columns:
+                    raise ValueError('The history path contains another database. Choose a separate app data folder.')
         self.db = sqlite3.connect(path)
         version = self.db.execute("PRAGMA user_version").fetchone()[0]
         if version > 2:
@@ -175,7 +187,11 @@ class Store:
             raise ValueError("This data was saved by a newer version. Update WriteWatch to open it.")
         exists = self.db.execute("SELECT 1 FROM sqlite_master WHERE name='sessions'").fetchone()
         if version < 2 and exists:
-            with closing(sqlite3.connect(str(path) + f".backup-v{version}")) as backup:
+            # Never overwrite a previous migration backup or a linked file.
+            backup_path = Path(str(path) + f".backup-v{version}-{uuid.uuid4().hex}")
+            with backup_path.open('xb'):
+                pass
+            with closing(sqlite3.connect(backup_path)) as backup:
                 self.db.backup(backup)
 
         self.db.row_factory = sqlite3.Row

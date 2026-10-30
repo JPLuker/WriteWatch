@@ -80,6 +80,6 @@ class RevisionTests(unittest.TestCase):
             self.assertNotIn('Words added', old.summary())
             self.assertEqual(store.db.execute('PRAGMA user_version').fetchone()[0], 2)
             store.close()
-            with closing(sqlite3.connect(str(path) + '.backup-v1')) as db:
+            with closing(sqlite3.connect(next(path.parent.glob(path.name + '.backup-v1-*')))) as db:
                 self.assertEqual(db.execute('PRAGMA user_version').fetchone()[0], 1)
                 self.assertEqual(db.execute('SELECT pages FROM sessions').fetchone()[0], 2.5)

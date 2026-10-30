@@ -70,7 +70,7 @@ class StorageTests(unittest.TestCase):
             store = Store(old / 'history.sqlite3')
             store.close()
             storage = Storage(root / 'new', root / 'cache', root / 'logs', old)
-            with patch('writewatch.storage.os.replace', side_effect=OSError('full disk')):
+            with patch('writewatch.storage.os.link', side_effect=OSError('full disk')):
                 with self.assertRaises(OSError):
                     migrate(storage)
             self.assertTrue((old / 'history.sqlite3').exists())

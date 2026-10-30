@@ -137,7 +137,7 @@ class MigrationTests(unittest.TestCase):
             session = store.history()[0]
             self.assertEqual((session.unit, session.progress, session.net), ('minutes', .5, -100))
             store.close()
-            backup = Path(str(path) + '.backup-v0')
+            backup = next(path.parent.glob(path.name + '.backup-v0-*'))
             with closing(sqlite3.connect(backup)) as db:
                 self.assertEqual(db.execute('PRAGMA user_version').fetchone()[0], 0)
                 self.assertEqual(db.execute('SELECT net FROM sessions').fetchone()[0], -100)

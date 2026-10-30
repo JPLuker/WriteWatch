@@ -6,9 +6,8 @@ import math
 import os
 from pathlib import Path
 import re
-import shutil
-import tempfile
 
+from .protection import write_new, remove_file, safe_directory
 from .core import Session
 from .metrics import default_preferences, validate_preferences
 
@@ -81,16 +80,7 @@ def write_backup(path, payload):
     data = json.dumps(payload, ensure_ascii=False, indent=2, allow_nan=False).encode('utf-8')
     if len(data) > MAX_BACKUP:
         raise ValueError('Backup exceeds 32 MB.')
-    path = Path(path)
-    fd, name = tempfile.mkstemp(prefix='.writewatch-export-', dir=path.parent)
-    try:
-        with os.fdopen(fd, 'wb') as target:
-            target.write(data)
-            target.flush()
-            os.fsync(target.fileno())
-        os.replace(name, path)
-    finally:
-        Path(name).unlink(missing_ok=True)
+    write_new(path, data)
 
 
 def read_backup(path):
@@ -118,26 +108,22 @@ def merge_sessions(store, payload):
     return added
 
 
-def remove_owned(path):
-    if path.is_symlink() or path.is_file():
-        path.unlink()
-    elif path.is_dir():
-        shutil.rmtree(path)
+def clear_cache(folder, protected=()):
+    from .storage import clear_artifacts
+    clear_artifacts(Path(folder) / 'updates', protected=protected)
+    clear_artifacts(Path(folder) / 'logs', logs=True, protected=protected)
 
 
-def clear_cache(folder):
-    remove_owned(Path(folder) / 'updates')
-    remove_owned(Path(folder) / 'logs')
-
-
-def delete_owned_data(folder):
-    """Preserve arbitrary siblings, including documents and user-exported backups."""
+def delete_owned_data(folder, protected=()):
+    """Remove app files only; preserve links, documents and every nested folder."""
     folder = Path(folder)
-    clear_cache(folder)
+    if not safe_directory(folder):
+        return
+    clear_cache(folder, protected)
     for name in ('appearance.ini', 'updates.ini', 'recents.ini', 'metrics.ini'):
-        remove_owned(folder / name)
+        remove_file(folder / name, protected)
     for path in folder.glob('history.sqlite3.backup-v*'):
-        if re.fullmatch(r'history\.sqlite3\.backup-v\d+', path.name):
-            remove_owned(path)
+        if re.fullmatch(r'history\.sqlite3\.backup-v\d+(?:-[a-f0-9]+)?', path.name):
+            remove_file(path, protected)
     for suffix in ('-wal', '-shm', '-journal', ''):
-        remove_owned(folder / ('history.sqlite3' + suffix))
+        remove_file(folder / ('history.sqlite3' + suffix), protected)

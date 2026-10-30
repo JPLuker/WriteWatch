@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+## [0.14.1] — 2026-10-29
+### Fixed
+- Replace recursive cache/data deletion with file-by-file cleanup; preserve documents, nested folders, links and known watched paths.
+- Refuse to overwrite existing backup exports or share images, including hard links and symbolic links.
+- Refuse linked app-data files and unrelated history databases; keep unique migration backups and never replace migration destinations.
+- Protect updater downloads, helper scripts and logs against overwriting existing files; use unique logs and partial-download names.
+- Keep existing AppImage staging/backup files if an update filename collides.
+
 ## [0.14.0] — 2026-10-25
 ### Added
 - Delete an individual completed or interrupted session from History, with confirmation identifying the selected session.
